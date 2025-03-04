@@ -9,7 +9,7 @@ contains
         PPFD_SUN, PPFD_SHADE, TLEAF_SUN, TLEAF_SHADE, PPFD24_SUN, &
         PPFD24_SHADE, TLEAF24_AVE,  &
         PPFD240_SUN, PPFD240_SHADE, &
-        TLEAF240_AVE, TKA, TEMP2, LU_OPT, &
+        TLEAF240_AVE, TKA, DSWRF, TEMP2, LU_OPT, &
         VTYPE, MODRES, CCE, VERT, CO2OPT, CO2SET, &
         LEAFAGEOPT, PASTLAI, CURRENTLAI, TSTEPLAI, &
         LOSSOPT, LOSSSET, LOSSIND, LIFETIME, USTAR, &
@@ -74,6 +74,7 @@ contains
         REAL(RK),    INTENT( IN )       :: TLEAF240_AVE(:)    ! Average Leaf temp (K)
         REAL(RK),    INTENT( IN )       :: TKA(:)          ! Interpolated air temp (K)
 
+        REAL(RK),    INTENT( IN )       :: DSWRF           ! Model input downward shortwave radiation (W/m2)
         REAL(RK),    INTENT( IN )       :: TEMP2           ! Model input 2-m Temperature (K)
         INTEGER,     INTENT( IN )       :: LU_OPT          ! integer for LU type from model mapped to Massman et al. (default = 0/VIIRS)
         INTEGER,     INTENT( IN )       :: VTYPE           ! Grid cell dominant vegetation type
@@ -223,19 +224,24 @@ contains
         GammaTLEAF_SHADE_LIF = exp(BETA*(TKA-303.0_rk))
 
 ! Calculate gamma (activity) values for average PPFD (Clifton et al., 2022; based on Guenther et al. 2012)
-        ALPHA_P_SUN = 0.004 - 0.0005*log(PPFD240_SUN)
-        ALPHA_P_SHADE = 0.004 - 0.0005*log(PPFD240_SHADE)
-        CP_SUN = 0.0468*(PPFD240_SUN**(0.6))*exp(0.005*(PPFD24_SUN-PPFD0_SUN))
-        CP_SHADE = 0.0468*(PPFD240_SHADE**(0.6))*exp(0.005*(PPFD24_SHADE-PPFD0_SHADE))
-        GammaPPFD_SUN_LDF   = CP_SUN*((ALPHA_P_SUN*PPFD_SUN)/SQRT(1.0 + (ALPHA_P_SUN**2.0) * (PPFD_SUN**2.0)))
-        GammaPPFD_SHADE_LDF = CP_SHADE*((ALPHA_P_SHADE*PPFD_SHADE)/SQRT(1.0 + (ALPHA_P_SHADE**2.0) * (PPFD_SHADE**2.0)))
+        if (DSWRF .gt. 0.0_rk) then
+            ALPHA_P_SUN = 0.004 - 0.0005*log(PPFD240_SUN)
+            ALPHA_P_SHADE = 0.004 - 0.0005*log(PPFD240_SHADE)
+            CP_SUN = 0.0468*(PPFD240_SUN**(0.6))*exp(0.005*(PPFD24_SUN-PPFD0_SUN))
+            CP_SHADE = 0.0468*(PPFD240_SHADE**(0.6))*exp(0.005*(PPFD24_SHADE-PPFD0_SHADE))
+            GammaPPFD_SUN_LDF = CP_SUN*((ALPHA_P_SUN*PPFD_SUN)/SQRT(1.0 + (ALPHA_P_SUN**2.0) * (PPFD_SUN**2.0)))
+            GammaPPFD_SHADE_LDF = CP_SHADE*((ALPHA_P_SHADE*PPFD_SHADE)/SQRT(1.0 + (ALPHA_P_SHADE**2.0) * (PPFD_SHADE**2.0)))
+        else
+            GammaPPFD_SUN_LDF = 0.0_rk
+            GammaPPFD_SHADE_LDF = 0.0_rk
+        end if
 
         GammaPPFD_SUN_LDF = MAX( GammaPPFD_SUN_LDF, 0.0_rk )
         GammaPPFD_SHADE_LDF = MAX( GammaPPFD_SHADE_LDF, 0.0_rk )
 
-        GammaTLEAF_PPFD_LDF = (GammaPPFD_SUN_LDF*GammaTLEAF_SUN_LDF*FSUN) + (GammaPPFD_SHADE_LDF*GammaTLEAF_SHADE_LDF*(1.0 - FSUN))
+        GammaTLEAF_PPFD_LDF = (GammaPPFD_SUN_LDF*GammaTLEAF_SUN_LDF*FSUN) + (GammaPPFD_SHADE_LDF*GammaTLEAF_SHADE_LDF*(1.0-FSUN))
         GammaTLEAF_PPFD_LIF = (GammaTLEAF_SUN_LIF*FSUN) + (GammaTLEAF_SHADE_LIF*(1.0-FSUN))
-        GammaTLEAF_PPFD_AVE = (GammaTLEAF_PPFD_LDF*LDF) + (GammaTLEAF_PPFD_LIF*(1.0 - LDF))
+        GammaTLEAF_PPFD_AVE = (GammaTLEAF_PPFD_LDF*LDF) + (GammaTLEAF_PPFD_LIF*(1.0-LDF))
         GammaTLEAF_PPFD_AVE = MAX( GammaTLEAF_PPFD_AVE, 0.0_rk )
 
 ! Get CO2 inhibition factor for isoprene only
