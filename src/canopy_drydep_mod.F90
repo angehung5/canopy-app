@@ -95,14 +95,14 @@ contains
 
 
     SUBROUTINE CANOPY_GAS_DRYDEP_SOIL( CHEMMECHGAS_OPT,CHEMMECHGAS_TOT, &
-        TEMPA, PRESSA, UBAR, SOCAT, SOTYP, DSOIL, STHETA, DEP_IND, DEP_OUT)
+        TEMPSOIL, PRESSA, UBAR, SOCAT, SOTYP, DSOIL, STHETA, DEP_IND, DEP_OUT)
 
         use canopy_const_mod,  ONLY: rk                       !constants for canopy models
         use canopy_utils_mod,  ONLY: MolecDiff,SoilResist,SoilRbg
 
         INTEGER,     INTENT( IN )       :: CHEMMECHGAS_OPT    ! Select chemical mechanism
         INTEGER,     INTENT( IN )       :: CHEMMECHGAS_TOT    ! Select chemical mechanism gas species list
-        REAL(RK),    INTENT( IN )       :: TEMPA(:)           ! Ambient Temperature profile in canopy [K]
+        REAL(RK),    INTENT( IN )       :: TEMPSOIL           ! soil temperature in topsoil (K)
         REAL(RK),    INTENT( IN )       :: PRESSA(:)          ! Ambient Pressure profile in canopy [mb]
         REAL(RK),    INTENT( IN )       :: UBAR(:)            ! Mean above/in-canopy wind speed [m/s]
         INTEGER,     INTENT( IN )       :: SOCAT              ! input soil category datset used
@@ -117,14 +117,13 @@ contains
         real(rk)                        :: rsoill             ! resistance to diffusion thru soil pore space for chemical species (s/cm)
         real(rk)                        :: rbg                ! ground boundary layer resistance (s/cm)
 
-        mdiffl = MolecDiff(CHEMMECHGAS_OPT,CHEMMECHGAS_TOT,DEP_IND,TEMPA(1),PRESSA(1))  !Use surface temperature and pressure
+        mdiffl = MolecDiff(CHEMMECHGAS_OPT,CHEMMECHGAS_TOT,DEP_IND,TEMPSOIL,PRESSA(1))  !Use soil temperature and pressure
 
         rsoill = SoilResist(mdiffl,SOCAT,SOTYP,DSOIL,STHETA)
 
         rbg = SoilRbg(UBAR(2)*100.0_rk) !convert wind to cm/s   !Rbg(ground boundary layer resistance, s/cm)
         !Rbg is invariant to species not layers
-        !Must use second model layer as no-slip boundary condition for wind
-        !speed at z = 0
+        !Must use second model layer as physically correct no-slip boundary condition is applied for wind speed at z = 0
 
         DEP_OUT = 1.0/(rbg+rsoill)                               !deposition velocity to ground surface under canopy (cm/s)
 

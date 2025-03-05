@@ -97,6 +97,10 @@ SUBROUTINE canopy_calcs(nn)
                 soilw4ref      = variables_2d(i,j)%soilw4
                 wiltref        = variables_2d(i,j)%wilt
                 ozone_w126ref  = variables_2d(i,j)%ozone_w126
+                soilt1ref      = variables_2d(i,j)%soilt1
+                soilt2ref      = variables_2d(i,j)%soilt2
+                soilt3ref      = variables_2d(i,j)%soilt3
+                soilt4ref      = variables_2d(i,j)%soilt4
 
 ! ... calculate wind speed from u and v
                 ubzref   = sqrt((uref**2.0) + (vref**2.0))
@@ -803,11 +807,23 @@ SUBROUTINE canopy_calcs(nn)
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 1, ddep_no_3d(i,j,:))   ! [cm/s]
                                             endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 1, ddep_no_3d(i,j,1))   ! [cm/s]
+                                            endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                     zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 2, ddep_no2_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 2, ddep_no2_3d(i,j,1))   ! [cm/s]
                                             endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -818,7 +834,7 @@ SUBROUTINE canopy_calcs(nn)
                                             !soil gas dry depostion at level 1, i.e., z=0
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
                                                 call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
-                                                    tka_3d(i,j,:), pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
                                                     soilcat_opt,sotypref,soild1, soilw1ref, 3, ddep_o3_3d(i,j,1))   ! [cm/s]
                                             endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
@@ -827,11 +843,23 @@ SUBROUTINE canopy_calcs(nn)
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 4, ddep_hono_3d(i,j,:))   ! [cm/s]
                                             endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 4, ddep_hono_3d(i,j,1))   ! [cm/s]
+                                            endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                     zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 5, ddep_hno4_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 5, ddep_hno4_3d(i,j,1))   ! [cm/s]
                                             endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -839,11 +867,23 @@ SUBROUTINE canopy_calcs(nn)
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 6, ddep_hno3_3d(i,j,:))   ! [cm/s]
                                             endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 6, ddep_hno3_3d(i,j,1))   ! [cm/s]
+                                            endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                     zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 7, ddep_n2o5_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 7, ddep_n2o5_3d(i,j,1))   ! [cm/s]
                                             endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -851,11 +891,23 @@ SUBROUTINE canopy_calcs(nn)
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 8, ddep_co_3d(i,j,:))   ! [cm/s]
                                             endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 8, ddep_co_3d(i,j,1))   ! [cm/s]
+                                            endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                     zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 9, ddep_h2o2_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 9, ddep_h2o2_3d(i,j,1))   ! [cm/s]
                                             endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -863,11 +915,23 @@ SUBROUTINE canopy_calcs(nn)
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 10, ddep_ch4_3d(i,j,:))   ! [cm/s]
                                             endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 10, ddep_ch4_3d(i,j,1))   ! [cm/s]
+                                            endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                     zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 11, ddep_mo2_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 11, ddep_mo2_3d(i,j,1))   ! [cm/s]
                                             endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -875,11 +939,23 @@ SUBROUTINE canopy_calcs(nn)
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 12, ddep_op1_3d(i,j,:))   ! [cm/s]
                                             endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 12, ddep_op1_3d(i,j,1))   ! [cm/s]
+                                            endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                     zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 13, ddep_moh_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 13, ddep_moh_3d(i,j,1))   ! [cm/s]
                                             endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -887,11 +963,23 @@ SUBROUTINE canopy_calcs(nn)
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 14, ddep_no3_3d(i,j,:))   ! [cm/s]
                                             endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 14, ddep_no3_3d(i,j,1))   ! [cm/s]
+                                            endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 15) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                     zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 15, ddep_o3p_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 15) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 15, ddep_o3p_3d(i,j,1))   ! [cm/s]
                                             endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -899,11 +987,23 @@ SUBROUTINE canopy_calcs(nn)
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 16, ddep_o1d_3d(i,j,:))   ! [cm/s]
                                             endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 16, ddep_o1d_3d(i,j,1))   ! [cm/s]
+                                            endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                     zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 17, ddep_ho_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 17, ddep_ho_3d(i,j,1))   ! [cm/s]
                                             endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -911,11 +1011,23 @@ SUBROUTINE canopy_calcs(nn)
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 18, ddep_ho2_3d(i,j,:))   ! [cm/s]
                                             endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 18, ddep_ho2_3d(i,j,1))   ! [cm/s]
+                                            endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                     zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 19, ddep_ora1_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 19, ddep_ora1_3d(i,j,1))   ! [cm/s]
                                             endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -923,11 +1035,23 @@ SUBROUTINE canopy_calcs(nn)
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 20, ddep_hac_3d(i,j,:))   ! [cm/s]
                                             endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 20, ddep_hac_3d(i,j,1))   ! [cm/s]
+                                            endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                     zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 21, ddep_paa_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 21, ddep_paa_3d(i,j,1))   ! [cm/s]
                                             endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -935,11 +1059,23 @@ SUBROUTINE canopy_calcs(nn)
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 22, ddep_dhmob_3d(i,j,:))   ! [cm/s]
                                             endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 22, ddep_dhmob_3d(i,j,1))   ! [cm/s]
+                                            endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                     zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 23, ddep_hpald_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 23, ddep_hpald_3d(i,j,1))   ! [cm/s]
                                             endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -947,11 +1083,23 @@ SUBROUTINE canopy_calcs(nn)
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 24, ddep_ishp_3d(i,j,:))   ! [cm/s]
                                             endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 24, ddep_ishp_3d(i,j,1))   ! [cm/s]
+                                            endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                     zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 25, ddep_iepox_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 25, ddep_iepox_3d(i,j,1))   ! [cm/s]
                                             endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -959,11 +1107,23 @@ SUBROUTINE canopy_calcs(nn)
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 26, ddep_propnn_3d(i,j,:))   ! [cm/s]
                                             endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 26, ddep_propnn_3d(i,j,1))   ! [cm/s]
+                                            endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                     zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 27, ddep_isopnb_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 27, ddep_isopnb_3d(i,j,1))   ! [cm/s]
                                             endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -971,11 +1131,23 @@ SUBROUTINE canopy_calcs(nn)
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 28, ddep_isopnd_3d(i,j,:))   ! [cm/s]
                                             endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 28, ddep_isopnd_3d(i,j,1))   ! [cm/s]
+                                            endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                     zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 29, ddep_macrn_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 29, ddep_macrn_3d(i,j,1))   ! [cm/s]
                                             endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -983,11 +1155,23 @@ SUBROUTINE canopy_calcs(nn)
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 30, ddep_mvkn_3d(i,j,:))   ! [cm/s]
                                             endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 30, ddep_mvkn_3d(i,j,1))   ! [cm/s]
+                                            endif
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                     zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
                                                     relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
                                                     dswrfref, 31, ddep_isnp_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa_3d(i,j,:), canWIND_3d(i,j,:),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, 31, ddep_isnp_3d(i,j,1))   ! [cm/s]
                                             endif
                                         else
                                             write(*,*)  'Wrong number of chemical species of ', chemmechgas_tot
@@ -1068,6 +1252,11 @@ SUBROUTINE canopy_calcs(nn)
             soilw4ref      = variables(loc)%soilw4
             wiltref        = variables(loc)%wilt
             ozone_w126ref  = variables(loc)%ozone_w126
+            soilt1ref      = variables(loc)%soilt1
+            soilt2ref      = variables(loc)%soilt2
+            soilt3ref      = variables(loc)%soilt3
+            soilt4ref      = variables(loc)%soilt4
+
 
             if (var3d_opt .eq. 1) then !allocated so set
                 pavd_arr     = (/variables_can(loc)%pavd01, &
@@ -1809,11 +1998,23 @@ SUBROUTINE canopy_calcs(nn)
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 1, ddep_no(loc,:))   ! [cm/s]
                                         endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 1, ddep_no(loc,1))   ! [cm/s]
+                                        endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                 zk, hcmref, tka(loc,:), pressa(loc,:), &
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 2, ddep_no2(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 2, ddep_no2(loc,1))   ! [cm/s]
                                         endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -1821,11 +2022,23 @@ SUBROUTINE canopy_calcs(nn)
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 3, ddep_o3(loc,:))   ! [cm/s]
                                         endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 3, ddep_o3(loc,1))   ! [cm/s]
+                                        endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                 zk, hcmref, tka(loc,:), pressa(loc,:), &
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 4, ddep_hono(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 4, ddep_hono(loc,1))   ! [cm/s]
                                         endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -1833,11 +2046,23 @@ SUBROUTINE canopy_calcs(nn)
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 5, ddep_hno4(loc,:))   ! [cm/s]
                                         endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 5, ddep_hno4(loc,1))   ! [cm/s]
+                                        endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                 zk, hcmref, tka(loc,:), pressa(loc,:), &
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 6, ddep_hno3(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 6, ddep_hno3(loc,1))   ! [cm/s]
                                         endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -1845,11 +2070,23 @@ SUBROUTINE canopy_calcs(nn)
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 7, ddep_n2o5(loc,:))   ! [cm/s]
                                         endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 7, ddep_n2o5(loc,1))   ! [cm/s]
+                                        endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                 zk, hcmref, tka(loc,:), pressa(loc,:), &
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 8, ddep_co(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 8, ddep_co(loc,1))   ! [cm/s]
                                         endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -1857,11 +2094,23 @@ SUBROUTINE canopy_calcs(nn)
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 9, ddep_h2o2(loc,:))   ! [cm/s]
                                         endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 9, ddep_h2o2(loc,1))   ! [cm/s]
+                                        endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                 zk, hcmref, tka(loc,:), pressa(loc,:), &
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 10, ddep_ch4(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 10, ddep_ch4(loc,1))   ! [cm/s]
                                         endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -1869,11 +2118,23 @@ SUBROUTINE canopy_calcs(nn)
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 11, ddep_mo2(loc,:))   ! [cm/s]
                                         endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 11, ddep_mo2(loc,1))   ! [cm/s]
+                                        endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                 zk, hcmref, tka(loc,:), pressa(loc,:), &
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 12, ddep_op1(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 12, ddep_op1(loc,1))   ! [cm/s]
                                         endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -1881,11 +2142,23 @@ SUBROUTINE canopy_calcs(nn)
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 13, ddep_moh(loc,:))   ! [cm/s]
                                         endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 13, ddep_moh(loc,1))   ! [cm/s]
+                                        endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                 zk, hcmref, tka(loc,:), pressa(loc,:), &
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 14, ddep_no3(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 14, ddep_no3(loc,1))   ! [cm/s]
                                         endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt ==15) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -1893,11 +2166,23 @@ SUBROUTINE canopy_calcs(nn)
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 15, ddep_o3p(loc,:))   ! [cm/s]
                                         endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 15) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 15, ddep_o3p(loc,1))   ! [cm/s]
+                                        endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                 zk, hcmref, tka(loc,:), pressa(loc,:), &
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 16, ddep_o1d(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 16, ddep_o1d(loc,1))   ! [cm/s]
                                         endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -1905,11 +2190,23 @@ SUBROUTINE canopy_calcs(nn)
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 17, ddep_ho(loc,:))   ! [cm/s]
                                         endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 17, ddep_ho(loc,1))   ! [cm/s]
+                                        endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                 zk, hcmref, tka(loc,:), pressa(loc,:), &
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 18, ddep_ho2(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 18, ddep_ho2(loc,1))   ! [cm/s]
                                         endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -1917,11 +2214,23 @@ SUBROUTINE canopy_calcs(nn)
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 19, ddep_ora1(loc,:))   ! [cm/s]
                                         endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 19, ddep_ora1(loc,1))   ! [cm/s]
+                                        endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                 zk, hcmref, tka(loc,:), pressa(loc,:), &
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 20, ddep_hac(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 20, ddep_hac(loc,1))   ! [cm/s]
                                         endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -1929,11 +2238,23 @@ SUBROUTINE canopy_calcs(nn)
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 21, ddep_paa(loc,:))   ! [cm/s]
                                         endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 21, ddep_paa(loc,1))   ! [cm/s]
+                                        endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                 zk, hcmref, tka(loc,:), pressa(loc,:), &
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 22, ddep_dhmob(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 22, ddep_dhmob(loc,1))   ! [cm/s]
                                         endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -1941,11 +2262,23 @@ SUBROUTINE canopy_calcs(nn)
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 23, ddep_hpald(loc,:))   ! [cm/s]
                                         endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 23, ddep_hpald(loc,1))   ! [cm/s]
+                                        endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                 zk, hcmref, tka(loc,:), pressa(loc,:), &
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 24, ddep_ishp(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 24, ddep_ishp(loc,1))   ! [cm/s]
                                         endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -1953,11 +2286,23 @@ SUBROUTINE canopy_calcs(nn)
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 25, ddep_iepox(loc,:))   ! [cm/s]
                                         endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 25, ddep_iepox(loc,1))   ! [cm/s]
+                                        endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                 zk, hcmref, tka(loc,:), pressa(loc,:), &
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 26, ddep_propnn(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 26, ddep_propnn(loc,1))   ! [cm/s]
                                         endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -1965,11 +2310,23 @@ SUBROUTINE canopy_calcs(nn)
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 27, ddep_isopnb(loc,:))   ! [cm/s]
                                         endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 27, ddep_isopnb(loc,1))   ! [cm/s]
+                                        endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                 zk, hcmref, tka(loc,:), pressa(loc,:), &
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 28, ddep_isopnd(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 28, ddep_isopnd(loc,1))   ! [cm/s]
                                         endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
@@ -1977,17 +2334,35 @@ SUBROUTINE canopy_calcs(nn)
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 29, ddep_macrn(loc,:))   ! [cm/s]
                                         endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 29, ddep_macrn(loc,1))   ! [cm/s]
+                                        endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                 zk, hcmref, tka(loc,:), pressa(loc,:), &
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 30, ddep_mvkn(loc,:))   ! [cm/s]
                                         endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 30, ddep_mvkn(loc,1))   ! [cm/s]
+                                        endif
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                 zk, hcmref, tka(loc,:), pressa(loc,:), &
                                                 relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
                                                 dswrfref, 31, ddep_isnp(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa(loc,:), canWIND(loc,:),  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, 31, ddep_isnp(loc,1))   ! [cm/s]
                                         endif
                                     else
                                         write(*,*)  'Wrong number of chemical species of ', chemmechgas_tot

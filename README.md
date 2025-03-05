@@ -10,7 +10,13 @@
 
 Repository for low-level, stand-alone/column canopy parameterizations for testing and application to gridded atmospheric composition/air quality models.
 
-Authors: Patrick Campbell, Zachary Moon, and Wei-Ting Hung
+Authors: Patrick Campbell, Zachary Moon, Wei-Ting Hung, Margaret Marvin, Quazi Rasool, and other NOAA research team members.
+
+##  Coming Soon
+
+### ReadTheDocs Documentation
+
+https://canopy-app.readthedocs.io/en/latest/
 
 ## Getting Started
 
@@ -203,7 +209,11 @@ The Canopy-App input data in [Table 2](#table-2-canopy-app-required-input-variab
 | `soilw2`                         | Volumetric soil moisture in layer 2 (m3 m-3) | UFS NOAA/GFSv16                                   |
 | `soilw3`                         | Volumetric soil moisture in layer 3 (m3 m-3) | UFS NOAA/GFSv16                                   |
 | `soilw4`                         | Volumetric soil moisture in layer 4 (m3 m-3) | UFS NOAA/GFSv16                                   |
-| `wilt`                           | Wilting point (proportion)                  | UFS NOAA/GFSv16                                    |
+| `soilt1`                         | Soil temperature in layer 1 (K)              | UFS NOAA/GFSv16                                   |
+| `soilt2`                         | Soil temperature in layer 2 (K)              | UFS NOAA/GFSv16                                   |
+| `soilt3`                         | Soil temperature in layer 3 (K)              | UFS NOAA/GFSv16                                   |
+| `soilt4`                         | Soil temperature in layer 4 (K)              | UFS NOAA/GFSv16                                   |
+| `wilt`                           | Wilting point (proportion)                   | UFS NOAA/GFSv16                                    |
 | **External Canopy Variables**    | **Variable Description and Units**          | **Data Source/Reference (if necessary)**           |
 | `ch`                             | Canopy height (m)                    | Globally extended GEDI data. Data Period=2020. Data frequency=Annual. ([Lang et al., 2023](https://doi.org/10.1038/s41559-023-02206-6)) |
 | `clu`                            | Canopy clumping index (dimensionless)       | GriddingMachine/MODIS. Data Period=2001-2017 Climatology. Data frequency=Monthly. ([Wei et al., 2019](https://doi.org/10.1016/j.rse.2019.111296)). Extended globally for high latitudes using methods described [here](https://gmuedu-my.sharepoint.com/:w:/g/personal/whung_gmu_edu/EdglXmW2kzBDtDj1xV0alGcB1Yo2I8hzdyWGVGB2YOTfgw). |

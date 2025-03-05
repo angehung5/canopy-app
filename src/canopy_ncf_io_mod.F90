@@ -3456,7 +3456,6 @@ CONTAINS
                 CALL exit(2)
             ENDIF
             variables_2d%wilt=variables_2d_real
-
             !Also reshape to 1D array for 1D calculation and output
 !            variables%wilt=reshape(variables_2d%wilt,[size(variables_2d%wilt)])
             !Ozone W126
@@ -3467,9 +3466,48 @@ CONTAINS
                 CALL exit(2)
             ENDIF
             variables_2d%ozone_w126=variables_2d_real
-
             !Also reshape to 1D array for 1D calculation and output
 !            variables%ozone_w126=reshape(variables_2d%ozone_w126,[size(variables_2d%ozone_w126)])
+            !Soil temperature level 1
+            CALL get_var_2d_real_cdf (cdfid, 'soilt1', variables_2d_real, it, rcode)
+            IF ( rcode /= nf90_noerr ) THEN
+                WRITE (*,f9410) TRIM(pname), 'soilt1',  &
+                    TRIM(nf90_strerror(rcode))
+                CALL exit(2)
+            ENDIF
+            variables_2d%soilt1=variables_2d_real
+            !Also reshape to 1D array for 1D calculation and output
+!            variables%soilt1=reshape(variables_2d%soilt1,[size(variables_2d%soilt1)])
+            !Soil temperature level 2
+            CALL get_var_2d_real_cdf (cdfid, 'soilt2', variables_2d_real, it, rcode)
+            IF ( rcode /= nf90_noerr ) THEN
+                WRITE (*,f9410) TRIM(pname), 'soilt2',  &
+                    TRIM(nf90_strerror(rcode))
+                CALL exit(2)
+            ENDIF
+            variables_2d%soilt2=variables_2d_real
+            !Also reshape to 1D array for 1D calculation and output
+!            variables%soilt2=reshape(variables_2d%soilt2,[size(variables_2d%soilt2)])
+            !Soil temperature level 3
+            CALL get_var_2d_real_cdf (cdfid, 'soilt3', variables_2d_real, it, rcode)
+            IF ( rcode /= nf90_noerr ) THEN
+                WRITE (*,f9410) TRIM(pname), 'soilt3',  &
+                    TRIM(nf90_strerror(rcode))
+                CALL exit(2)
+            ENDIF
+            variables_2d%soilt3=variables_2d_real
+            !Also reshape to 1D array for 1D calculation and output
+!            variables%soilt3=reshape(variables_2d%soilt3,[size(variables_2d%soilt3)])
+            !Soil temperature level 4
+            CALL get_var_2d_real_cdf (cdfid, 'soilt4', variables_2d_real, it, rcode)
+            IF ( rcode /= nf90_noerr ) THEN
+                WRITE (*,f9410) TRIM(pname), 'soilt4',  &
+                    TRIM(nf90_strerror(rcode))
+                CALL exit(2)
+            ENDIF
+            variables_2d%soilt4=variables_2d_real
+            !Also reshape to 1D array for 1D calculation and output
+!            variables%soilt4=reshape(variables_2d%soilt4,[size(variables_2d%soilt4)])
 
             !3D Input Level Profile
             if (var3d_opt .eq. 1) then
