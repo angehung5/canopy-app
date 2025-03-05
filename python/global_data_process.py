@@ -192,7 +192,16 @@ for inputtime in timelist:
         path + "/gfs.t" + HH + "z." + YY + MM + DD + ".sfcf" + FH + ".nc"
     )  # gfs met file
     f_can = (
-        path + "/gfs.canopy.t" + HH + "z." + "2022" + MM + DD + ".sfcf" + FH + ".global.nc"
+        path
+        + "/gfs.canopy.t"
+        + HH
+        + "z."
+        + "2022"
+        + MM
+        + DD
+        + ".sfcf"
+        + FH
+        + ".global.nc"
     )  # canopy file
     f_output = (
         path + "/gfs.t" + HH + "z." + YY + MM + DD + ".sfcf" + FH + ".canopy.nc"
@@ -262,7 +271,14 @@ for inputtime in timelist:
                 "--no-check-certificate",
                 "--no-proxy",
                 "-O",
-                path + "/gfs.canopy.t12z." + "2022" + MM + DD + ".sfcf" + FH + ".global.nc",
+                path
+                + "/gfs.canopy.t12z."
+                + "2022"
+                + MM
+                + DD
+                + ".sfcf"
+                + FH
+                + ".global.nc",
                 "https://noaa-oar-arl-nacc-pds.s3.amazonaws.com/inputs/geo-files/"
                 + "gfs.canopy.t12z."
                 + "2022"
