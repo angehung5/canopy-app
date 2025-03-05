@@ -176,17 +176,21 @@ The Canopy-App input data in [Table 2](#table-2-canopy-app-required-input-variab
 
 **More Information on Data Sources from [Table 2](#table-2-canopy-app-required-input-variables):**
 
-**Global GFS meteorological files are available on AWS:**
+**Global GFS meteorological files are available on [AWS](https://registry.opendata.aws/noaa-oar-arl-nacc-pds/):**
+
 ```
 https://noaa-oar-arl-nacc-pds.s3.amazonaws.com/inputs/
 ```
 
 Hourly gridded GFSv16 data is available from March 23, 2021 - Current Day and is supplemented by calculated and canopy parameters shown in Table 2.
 
-**Global canopy files for 2022 are available on AWS:**
+**Global 13-km global canopy files for 2022 are available on [AWS](https://registry.opendata.aws/noaa-oar-arl-nacc-pds/):**
+
 ```
 https://noaa-oar-arl-nacc-pds.s3.amazonaws.com/inputs/geo-files/
 ```
+
+**and global 1-km canopy data representative of 2020 is available on [NCEI](https://www.ncei.noaa.gov/access/metadata/landing-page/bin/iso?id=gov.noaa.nodc:0295750)**
 
 **GriddingMachine:** GriddingMachine is open source database and software for Earth system modeling at global and regional scales.  Data is easily accessible in consistent formats for ease of downloading/processing.  All available datasets may be found at:  https://github.com/CliMA/GriddingMachine.jl. ([Wang et al., 2022](https://doi.org/10.1038/s41597-022-01346-x)).
 

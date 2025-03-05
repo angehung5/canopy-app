@@ -26,7 +26,7 @@ timelist = sys.argv[1]
 timelist = np.array(timelist.split(",")).astype(str)
 
 """User Options"""
-path = "/groups/ESS/whung/canopy_wind/gfsv16_test_data"  # work directory
+path = "./input"  # work directory
 ref_lev = 10  # reference height (m, a.g.l.)
 frp_src = 0  # frp data source (0: local fire product; 1: 12 month climatology; 2: all ones when ifcanwaf=.FALSE.)
 
@@ -192,7 +192,16 @@ for inputtime in timelist:
         path + "/gfs.t" + HH + "z." + YY + MM + DD + ".sfcf" + FH + ".nc"
     )  # gfs met file
     f_can = (
-        path + "/gfs.canopy.t" + HH + "z." + "2022" + MM + DD + ".sfcf000.global.nc"
+        path
+        + "/gfs.canopy.t"
+        + HH
+        + "z."
+        + "2022"
+        + MM
+        + DD
+        + ".sfcf"
+        + FH
+        + ".global.nc"
     )  # canopy file
     f_output = (
         path + "/gfs.t" + HH + "z." + YY + MM + DD + ".sfcf" + FH + ".canopy.nc"
@@ -275,9 +284,7 @@ for inputtime in timelist:
                 + "2022"
                 + MM
                 + DD
-                + ".sfcf"
-                + FH
-                + ".global.nc",
+                + ".sfcf000.global.nc",
             ]
         )
         if os.path.isfile(f_can) is True:
