@@ -81,13 +81,13 @@ You can also generate and run global gridded canopy-app inputs using Python.  No
    Example 1: 15-17 Jul 2020 12Z, forecast hour=0
 
    ```
-   python global_data_process.py 2020071512000,2020071612000,2020071712000
+   python python/global_data_process.py 2020071512000,2020071612000,2020071712000
    ```
 
    Example 2: 1 Jul 2020 12Z, forecast hour=0-4
 
    ```
-   python global_data_process.py 2020070112000,2020070112001,2020070112002,2020070112003,2020070112004
+   python python/global_data_process.py 2020070112000,2020070112001,2020070112002,2020070112003,2020070112004
    ```
 ### Running global data process and canopy-app with global data (following Example 1 above)
 
