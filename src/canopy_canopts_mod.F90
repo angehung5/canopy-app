@@ -68,4 +68,5 @@ MODULE canopy_canopts_mod
     integer             ::    chemmechgas_opt  !Set default integer value to select chemical mechanism (0, RACM2)
     integer             ::    chemmechgas_tot  !Set default integer value to select chemical mechanism gas species list including transported (31, RACM2)
     integer             ::    soilcat_opt  !Set default integer value to select soil category option (0, STATSGO/FAO)!
+    real(rk)            ::    hyblev1      !Set default approximate input height of 1st hybrid model layer above ground (used for temp lapse rate approximation) (default=20.0 meters)
 END MODULE canopy_canopts_mod

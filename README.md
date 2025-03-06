@@ -202,6 +202,7 @@ The Canopy-App input data in [Table 2](#table-2-canopy-app-required-input-variab
 | `shtfl`                          | Instantaneous sensible heat flux at surface (W/m2) | UFS NOAA/GFSv16                             |
 | `tmpsfc`                         | Surface temperature (K)                     | UFS NOAA/GFSv16                                    |
 | `tmp2m`                          | 2-meter temperature (K)                     | UFS NOAA/GFSv16                                    |
+| `tmp_hyblev1`                    | 1st hybrid model layer temperature (K)      | UFS NOAA/GFSv16                                    |
 | `spfh2m`                         | 2-meter specific humidity (kg/kg)           | UFS NOAA/GFSv16                                    |
 | `hpbl`                           | Height of the planetary boundary layer (m)  | UFS NOAA/GFSv16                                    |
 | `prate_ave`                      | Average mass precipitation rate (kg m-2 s-1) | UFS NOAA/GFSv16                                   |
@@ -238,7 +239,7 @@ https://noaa-oar-arl-nacc-pds.s3.amazonaws.com/inputs/
 
 Hourly gridded GFSv16 data is available from March 23, 2021 - Current Day and is supplemented by calculated and canopy parameters shown in Table 2.
 
-**Global 13-km global canopy files for 2022 are available on [AWS](https://registry.opendata.aws/noaa-oar-arl-nacc-pds/):**
+**Global 13-km global canopy files (based on 2020 satellite data) combined with 2022 GFS meteorology are available on [AWS](https://registry.opendata.aws/noaa-oar-arl-nacc-pds/):**
 
 ```
 https://noaa-oar-arl-nacc-pds.s3.amazonaws.com/inputs/geo-files/
@@ -357,7 +358,7 @@ Otherwise, please contact Patrick.C.Campbell@noaa.gov for other GFSv16 data peri
 | `ddepspecgas_opt`   | user set option to select species for NetCDF gas dry deposition output (`0`: all species, or e.g., `1-31`: for one species selected according to ID number - Table 2 and the specific gas chemical mechanism (e.g., RACM2) (default: 0; ID number for single species selection only used if `infmt_opt=0`).  Note:  The single number species option should match that desired species from select chemical mechanism option (`chemmechgas_opt`), and not be greater than the total number of species within that gas chemical mechanism option used (`chemmechgas_tot`).         |
 | `chemmechgas_opt`   | user set option to select gas chemical mechanism and gas species mapping including transported species.  (`0`: Default = RACM2 mechanism; Only option currently).
 | `chemmechgas_tot`   | user set option to define total number of gas species in select gas chemical mechanism (`chemmechgas_opt`) including transported species.  (`31`: Default = RACM2 mechanism; Only option currently).
-
+| `hyblev1`   | user set real value of approximate height AGL of input 1st hybrid model layer associated with input `tmp_hyblev1` ( Default = 20 meters associated with GFSv16; Best used to approximate constant ambient temperature lapse rate with `tmp2m`, particularly in global appliations with areas of extreme soil or skin/surface temperature gradients).
 
 **\*\*** If `modres` >> `flameh` then some error in WAF calculation will be incurred.  Suggestion is to use relative fine `modres` (at least <= 0.5 m) compared to average flame heights (e.g., ~ 1.0 m) if WAF is required.
 

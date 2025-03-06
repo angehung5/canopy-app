@@ -46,6 +46,7 @@ MODULE canopy_canmet_mod
         real(rk)   :: soilt2       !soil temperature level 2 (K)
         real(rk)   :: soilt3       !soil temperature level 3 (K)
         real(rk)   :: soilt4       !soil temperature level 4 (K)
+        real(rk)   :: tmp_hyblev1  !1st model layer air temperature above ground (K)
     end TYPE variable_type
 
     type(variable_type), allocatable :: variables( : ), variables_2d( : , :)
@@ -136,6 +137,7 @@ MODULE canopy_canmet_mod
     real(rk)       ::    soilt2ref       !soil temperature level 2 (K)
     real(rk)       ::    soilt3ref       !soil temperature level 3 (K)
     real(rk)       ::    soilt4ref       !soil temperature level 4 (K)
+    real(rk)       ::    tmp_hyblev1ref  !1st model layer air temperature above ground (K)
 
 !    real(rk)       ::    lev01ref, lev02ref, lev03ref, lev04ref, lev05ref, & !Input canopy profile levels
 !                         lev06ref, lev07ref, lev08ref, lev09ref, lev10ref, &

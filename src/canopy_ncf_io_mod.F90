@@ -3508,6 +3508,16 @@ CONTAINS
             variables_2d%soilt4=variables_2d_real
             !Also reshape to 1D array for 1D calculation and output
 !            variables%soilt4=reshape(variables_2d%soilt4,[size(variables_2d%soilt4)])
+            !1st model layer air temperature above ground
+            CALL get_var_2d_real_cdf (cdfid, 'tmp_hyblev1', variables_2d_real, it, rcode)
+            IF ( rcode /= nf90_noerr ) THEN
+                WRITE (*,f9410) TRIM(pname), 'tmp_hyblev1',  &
+                    TRIM(nf90_strerror(rcode))
+                CALL exit(2)
+            ENDIF
+            variables_2d%tmp_hyblev1=variables_2d_real
+            !Also reshape to 1D array for 1D calculation and output
+!            variables%tmp_hyblev1=reshape(variables_2d%tmp_hyblev1,[size(variables_2d%tmp_hyblev1)])
 
             !3D Input Level Profile
             if (var3d_opt .eq. 1) then

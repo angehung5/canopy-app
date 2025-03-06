@@ -1079,9 +1079,9 @@ contains
 !**********************************************************************************************************************!
     function CalcTemp(zk, zref, taref, tsref)
         real(rk), intent(in)  :: zk        ! current z (cm)
-        real(rk), intent(in)  :: zref      ! reference z (cm) (e.g., = 200 cm if using 2-m temp)
-        real(rk), intent(in)  :: taref     ! air temperature at zref (C)  (e.g., 2-m temperature)
-        real(rk), intent(in)  :: tsref     ! surface temperature (C) (use model sfc layer or measured skin temp reference)
+        real(rk), intent(in)  :: zref      ! reference z (cm)
+        real(rk), intent(in)  :: taref     ! air temperature at zref (C)
+        real(rk), intent(in)  :: tsref     ! near surface temperature (C)
         real(rk)              :: dtmp      ! temperature gradient (C/cm)
         real(rk)              :: CalcTemp  ! air temp (K) at z
 
@@ -1089,7 +1089,6 @@ contains
 
         dtmp = (taref-tsref)/zref
         CalcTemp = (tsref + dtmp*zk) + 273.15_rk
-
         return
     end function CalcTemp
 
@@ -1149,6 +1148,8 @@ contains
         tc = tki - 273.15_rk
         e = pkpa*qhd/(0.622_rk+qhd)
         es = 0.6112_rk*exp(17.67_rk*tc/(tc+243.5_rk)) !Rogers et al. (1989)
+        !print*, 'qhi=',qhi,'pmbi=',pmbi, 'tki=', tki
+        !print*, 'e=', e, 'es=',es
         rhi = max(rhmin, min(rhmax, 100.0_rk*e/es))   ! bound RH to (rhmin, rhmax)
         CalcRelHum = rhi
         return

@@ -101,6 +101,7 @@ SUBROUTINE canopy_calcs(nn)
                 soilt2ref      = variables_2d(i,j)%soilt2
                 soilt3ref      = variables_2d(i,j)%soilt3
                 soilt4ref      = variables_2d(i,j)%soilt4
+                tmp_hyblev1ref = variables_2d(i,j)%tmp_hyblev1
 
 ! ... calculate wind speed from u and v
                 ubzref   = sqrt((uref**2.0) + (vref**2.0))
@@ -196,7 +197,10 @@ SUBROUTINE canopy_calcs(nn)
 ! ... calculate initial canopy temp/pressure/humidity/density profiles from first guess approximations (i.e., no leaf energy balance)
 
                             do k=1, modlays
-                                tka_3d(i,j,k)=CalcTemp(zk(k)*100.0_rk, 200.0_rk, tmp2mref-273.15_rk, tmpsfcref-273.15_rk) ! temp    [K]
+                                !For temperature we use 1st model layer and 2-m temperatures to estimate lapse rate, not tmpsfc
+                                !which is too extreme in some global locations.
+                                tka_3d(i,j,k)=CalcTemp(zk(k)*100.0_rk, (hyblev1*100.0_rk) - 200.0_rk, &
+                                    tmp_hyblev1ref-273.15_rk, tmp2mref-273.15_rk) ! temp    [K]
                                 pressa_3d(i,j,k)=CalcPressure(zk(k)*100.0_rk, 200.0_rk, pressfcref*0.01_rk, &
                                     tmp2mref, tmpsfcref)                                                                  ! press   [mb]
                                 relhuma_3d(i,j,k)=CalcRelHum(tka_3d(i,j,k),pressa_3d(i,j,k),spfh2mref*1000.0_rk)    ! relhum  [%]
@@ -1255,7 +1259,7 @@ SUBROUTINE canopy_calcs(nn)
             soilt2ref      = variables(loc)%soilt2
             soilt3ref      = variables(loc)%soilt3
             soilt4ref      = variables(loc)%soilt4
-
+            tmp_hyblev1ref = variables(loc)%tmp_hyblev1
 
             if (var3d_opt .eq. 1) then !allocated so set
                 pavd_arr     = (/variables_can(loc)%pavd01, &
@@ -1387,7 +1391,10 @@ SUBROUTINE canopy_calcs(nn)
 ! ... calculate initial canopy temp/pressure/humidity/density profiles from first guess approximations (i.e., no leaf energy balance)
 
                         do k=1, modlays
-                            tka(loc,k)=CalcTemp(zk(k)*100.0_rk, 200.0_rk, tmp2mref-273.15_rk, tmpsfcref-273.15_rk) ! temp    [K]
+                            !For temperature we use 1st model layer and 2-m temperatures to estimate lapse rate, not tmpsfc
+                            !which is too extreme in some global locations.
+                            tka(loc,k)=CalcTemp(zk(k)*100.0_rk, (hyblev1*100.0_rk) - 200.0_rk, &
+                                tmp_hyblev1ref-273.15_rk, tmp2mref-273.15_rk) ! temp    [K]
                             pressa(loc,k)=CalcPressure(zk(k)*100.0_rk, 200.0_rk, pressfcref*0.01_rk, &
                                 tmp2mref, tmpsfcref)                                                               ! press   [mb]
                             relhuma(loc,k)=CalcRelHum(tka(loc,k),pressa(loc,k),spfh2mref*1000.0_rk)          ! relhum  [%]
