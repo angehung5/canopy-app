@@ -814,7 +814,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
                     c_ddep_no%fld = fillreal
                     c_ddep_no%fldname = 'ddep_no'
-                    c_ddep_no%long_name = ' nitric oxide dry deposition rate'
+                    c_ddep_no%long_name = ' nitric oxide dry deposition velocity'
                     c_ddep_no%units = 'cm s-1'
                     c_ddep_no%fillvalue = fillreal
                     c_ddep_no%dimnames(1) = 'nlon'
@@ -831,7 +831,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
                     c_ddep_no2%fld = fillreal
                     c_ddep_no2%fldname = 'ddep_no2'
-                    c_ddep_no2%long_name = 'nitrogen dioxide dry deposition rate'
+                    c_ddep_no2%long_name = 'nitrogen dioxide dry deposition velocity'
                     c_ddep_no2%units = 'cm s-1'
                     c_ddep_no2%fillvalue = fillreal
                     c_ddep_no2%dimnames(1) = 'nlon'
@@ -848,7 +848,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
                     c_ddep_o3%fld = fillreal
                     c_ddep_o3%fldname = 'ddep_o3'
-                    c_ddep_o3%long_name = 'ozone dry deposition rate'
+                    c_ddep_o3%long_name = 'ozone dry deposition velocity'
                     c_ddep_o3%units = 'cm s-1'
                     c_ddep_o3%fillvalue = fillreal
                     c_ddep_o3%dimnames(1) = 'nlon'
@@ -865,7 +865,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
                     c_ddep_hono%fld = fillreal
                     c_ddep_hono%fldname = 'ddep_hono'
-                    c_ddep_hono%long_name = 'nitrous acid dry deposition rate'
+                    c_ddep_hono%long_name = 'nitrous acid dry deposition velocity'
                     c_ddep_hono%units = 'cm s-1'
                     c_ddep_hono%fillvalue = fillreal
                     c_ddep_hono%dimnames(1) = 'nlon'
@@ -882,7 +882,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
                     c_ddep_hno4%fld = fillreal
                     c_ddep_hno4%fldname = 'ddep_hno4'
-                    c_ddep_hno4%long_name = 'peroxynitric acid dry deposition rate'
+                    c_ddep_hno4%long_name = 'peroxynitric acid dry deposition velocity'
                     c_ddep_hno4%units = 'cm s-1'
                     c_ddep_hno4%fillvalue = fillreal
                     c_ddep_hno4%dimnames(1) = 'nlon'
@@ -899,7 +899,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
                     c_ddep_hno3%fld = fillreal
                     c_ddep_hno3%fldname = 'ddep_hno3'
-                    c_ddep_hno3%long_name = 'nitric acid dry deposition rate'
+                    c_ddep_hno3%long_name = 'nitric acid dry deposition velocity'
                     c_ddep_hno3%units = 'cm s-1'
                     c_ddep_hno3%fillvalue = fillreal
                     c_ddep_hno3%dimnames(1) = 'nlon'
@@ -916,7 +916,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
                     c_ddep_n2o5%fld = fillreal
                     c_ddep_n2o5%fldname = 'ddep_n2o5'
-                    c_ddep_n2o5%long_name = 'dinitrogen pentoxide dry deposition rate'
+                    c_ddep_n2o5%long_name = 'dinitrogen pentoxide dry deposition velocity'
                     c_ddep_n2o5%units = 'cm s-1'
                     c_ddep_n2o5%fillvalue = fillreal
                     c_ddep_n2o5%dimnames(1) = 'nlon'
@@ -933,7 +933,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
                     c_ddep_co%fld = fillreal
                     c_ddep_co%fldname = 'ddep_co'
-                    c_ddep_co%long_name = 'carbon monoxide dry deposition rate'
+                    c_ddep_co%long_name = 'carbon monoxide dry deposition velocity'
                     c_ddep_co%units = 'cm s-1'
                     c_ddep_co%fillvalue = fillreal
                     c_ddep_co%dimnames(1) = 'nlon'
@@ -950,7 +950,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
                     c_ddep_h2o2%fld = fillreal
                     c_ddep_h2o2%fldname = 'ddep_h2o2'
-                    c_ddep_h2o2%long_name = 'hydrogen peroxide dry deposition rate'
+                    c_ddep_h2o2%long_name = 'hydrogen peroxide dry deposition velocity'
                     c_ddep_h2o2%units = 'cm s-1'
                     c_ddep_h2o2%fillvalue = fillreal
                     c_ddep_h2o2%dimnames(1) = 'nlon'
@@ -967,7 +967,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
                     c_ddep_ch4%fld = fillreal
                     c_ddep_ch4%fldname = 'ddep_ch4'
-                    c_ddep_ch4%long_name = 'methane dry deposition rate'
+                    c_ddep_ch4%long_name = 'methane dry deposition velocity'
                     c_ddep_ch4%units = 'cm s-1'
                     c_ddep_ch4%fillvalue = fillreal
                     c_ddep_ch4%dimnames(1) = 'nlon'
@@ -984,7 +984,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
                     c_ddep_mo2%fld = fillreal
                     c_ddep_mo2%fldname = 'ddep_mo2'
-                    c_ddep_mo2%long_name = 'methylperoxy radical dry deposition rate'
+                    c_ddep_mo2%long_name = 'methylperoxy radical dry deposition velocity'
                     c_ddep_mo2%units = 'cm s-1'
                     c_ddep_mo2%fillvalue = fillreal
                     c_ddep_mo2%dimnames(1) = 'nlon'
@@ -1001,7 +1001,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
                     c_ddep_op1%fld = fillreal
                     c_ddep_op1%fldname = 'ddep_op1'
-                    c_ddep_op1%long_name = 'methyl hydrogen peroxide dry deposition rate'
+                    c_ddep_op1%long_name = 'methyl hydrogen peroxide dry deposition velocity'
                     c_ddep_op1%units = 'cm s-1'
                     c_ddep_op1%fillvalue = fillreal
                     c_ddep_op1%dimnames(1) = 'nlon'
@@ -1018,7 +1018,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
                     c_ddep_moh%fld = fillreal
                     c_ddep_moh%fldname = 'ddep_moh'
-                    c_ddep_moh%long_name = 'methanol dry deposition rate'
+                    c_ddep_moh%long_name = 'methanol dry deposition velocity'
                     c_ddep_moh%units = 'cm s-1'
                     c_ddep_moh%fillvalue = fillreal
                     c_ddep_moh%dimnames(1) = 'nlon'
@@ -1035,7 +1035,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
                     c_ddep_no3%fld = fillreal
                     c_ddep_no3%fldname = 'ddep_no3'
-                    c_ddep_no3%long_name = 'nitrate radical dry deposition rate'
+                    c_ddep_no3%long_name = 'nitrate radical dry deposition velocity'
                     c_ddep_no3%units = 'cm s-1'
                     c_ddep_no3%fillvalue = fillreal
                     c_ddep_no3%dimnames(1) = 'nlon'
@@ -1052,7 +1052,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 15) then
                     c_ddep_o3p%fld = fillreal
                     c_ddep_o3p%fldname = 'ddep_o3p'
-                    c_ddep_o3p%long_name = 'ground state oxygen atoms dry deposition rate'
+                    c_ddep_o3p%long_name = 'ground state oxygen atoms dry deposition velocity'
                     c_ddep_o3p%units = 'cm s-1'
                     c_ddep_o3p%fillvalue = fillreal
                     c_ddep_o3p%dimnames(1) = 'nlon'
@@ -1069,7 +1069,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
                     c_ddep_o1d%fld = fillreal
                     c_ddep_o1d%fldname = 'ddep_o1d'
-                    c_ddep_o1d%long_name = 'excited state oxygen atoms dry deposition rate'
+                    c_ddep_o1d%long_name = 'excited state oxygen atoms dry deposition velocity'
                     c_ddep_o1d%units = 'cm s-1'
                     c_ddep_o1d%fillvalue = fillreal
                     c_ddep_o1d%dimnames(1) = 'nlon'
@@ -1086,7 +1086,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
                     c_ddep_ho%fld = fillreal
                     c_ddep_ho%fldname = 'ddep_ho'
-                    c_ddep_ho%long_name = 'hydroxyl radical dry deposition rate'
+                    c_ddep_ho%long_name = 'hydroxyl radical dry deposition velocity'
                     c_ddep_ho%units = 'cm s-1'
                     c_ddep_ho%fillvalue = fillreal
                     c_ddep_ho%dimnames(1) = 'nlon'
@@ -1103,7 +1103,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
                     c_ddep_ho2%fld = fillreal
                     c_ddep_ho2%fldname = 'ddep_ho2'
-                    c_ddep_ho2%long_name = 'hydroperoxyl radical dry deposition rate'
+                    c_ddep_ho2%long_name = 'hydroperoxyl radical dry deposition velocity'
                     c_ddep_ho2%units = 'cm s-1'
                     c_ddep_ho2%fillvalue = fillreal
                     c_ddep_ho2%dimnames(1) = 'nlon'
@@ -1120,7 +1120,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
                     c_ddep_ora1%fld = fillreal
                     c_ddep_ora1%fldname = 'ddep_ora1'
-                    c_ddep_ora1%long_name = 'formic acid dry deposition rate'
+                    c_ddep_ora1%long_name = 'formic acid dry deposition velocity'
                     c_ddep_ora1%units = 'cm s-1'
                     c_ddep_ora1%fillvalue = fillreal
                     c_ddep_ora1%dimnames(1) = 'nlon'
@@ -1137,7 +1137,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
                     c_ddep_hac%fld = fillreal
                     c_ddep_hac%fldname = 'ddep_hac'
-                    c_ddep_hac%long_name = 'acetic acid dry deposition rate'
+                    c_ddep_hac%long_name = 'acetic acid dry deposition velocity'
                     c_ddep_hac%units = 'cm s-1'
                     c_ddep_hac%fillvalue = fillreal
                     c_ddep_hac%dimnames(1) = 'nlon'
@@ -1154,7 +1154,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
                     c_ddep_paa%fld = fillreal
                     c_ddep_paa%fldname = 'ddep_paa'
-                    c_ddep_paa%long_name = 'peroxyacetic acid dry deposition rate'
+                    c_ddep_paa%long_name = 'peroxyacetic acid dry deposition velocity'
                     c_ddep_paa%units = 'cm s-1'
                     c_ddep_paa%fillvalue = fillreal
                     c_ddep_paa%dimnames(1) = 'nlon'
@@ -1171,7 +1171,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
                     c_ddep_dhmob%fld = fillreal
                     c_ddep_dhmob%fldname = 'ddep_dhmob'
-                    c_ddep_dhmob%long_name = 'dihydroxy carbonyl dry deposition rate'
+                    c_ddep_dhmob%long_name = 'dihydroxy carbonyl dry deposition velocity'
                     c_ddep_dhmob%units = 'cm s-1'
                     c_ddep_dhmob%fillvalue = fillreal
                     c_ddep_dhmob%dimnames(1) = 'nlon'
@@ -1188,7 +1188,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
                     c_ddep_hpald%fld = fillreal
                     c_ddep_hpald%fldname = 'ddep_hpald'
-                    c_ddep_hpald%long_name = 'hydroperoxymethyl-butenals dry deposition rate'
+                    c_ddep_hpald%long_name = 'hydroperoxymethyl-butenals dry deposition velocity'
                     c_ddep_hpald%units = 'cm s-1'
                     c_ddep_hpald%fillvalue = fillreal
                     c_ddep_hpald%dimnames(1) = 'nlon'
@@ -1205,7 +1205,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
                     c_ddep_ishp%fld = fillreal
                     c_ddep_ishp%fldname = 'ddep_ishp'
-                    c_ddep_ishp%long_name = 'beta-hydroxy hydroperoxides from isop+ho2 dry deposition rate'
+                    c_ddep_ishp%long_name = 'beta-hydroxy hydroperoxides from isop+ho2 dry deposition velocity'
                     c_ddep_ishp%units = 'cm s-1'
                     c_ddep_ishp%fillvalue = fillreal
                     c_ddep_ishp%dimnames(1) = 'nlon'
@@ -1222,7 +1222,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
                     c_ddep_iepox%fld = fillreal
                     c_ddep_iepox%fldname = 'ddep_iepox'
-                    c_ddep_iepox%long_name = 'isoprene epoxydiol dry deposition rate'
+                    c_ddep_iepox%long_name = 'isoprene epoxydiol dry deposition velocity'
                     c_ddep_iepox%units = 'cm s-1'
                     c_ddep_iepox%fillvalue = fillreal
                     c_ddep_iepox%dimnames(1) = 'nlon'
@@ -1239,7 +1239,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
                     c_ddep_propnn%fld = fillreal
                     c_ddep_propnn%fldname = 'ddep_propnn'
-                    c_ddep_propnn%long_name = 'propanone nitrate dry deposition rate'
+                    c_ddep_propnn%long_name = 'propanone nitrate dry deposition velocity'
                     c_ddep_propnn%units = 'cm s-1'
                     c_ddep_propnn%fillvalue = fillreal
                     c_ddep_propnn%dimnames(1) = 'nlon'
@@ -1256,7 +1256,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
                     c_ddep_isopnb%fld = fillreal
                     c_ddep_isopnb%fldname = 'ddep_isopnb'
-                    c_ddep_isopnb%long_name = 'beta-hydroxy isoprene nitrates dry deposition rate'
+                    c_ddep_isopnb%long_name = 'beta-hydroxy isoprene nitrates dry deposition velocity'
                     c_ddep_isopnb%units = 'cm s-1'
                     c_ddep_isopnb%fillvalue = fillreal
                     c_ddep_isopnb%dimnames(1) = 'nlon'
@@ -1273,7 +1273,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
                     c_ddep_isopnd%fld = fillreal
                     c_ddep_isopnd%fldname = 'ddep_isopnd'
-                    c_ddep_isopnd%long_name = 'delta-hydroxy isoprene nitrates dry deposition rate'
+                    c_ddep_isopnd%long_name = 'delta-hydroxy isoprene nitrates dry deposition velocity'
                     c_ddep_isopnd%units = 'cm s-1'
                     c_ddep_isopnd%fillvalue = fillreal
                     c_ddep_isopnd%dimnames(1) = 'nlon'
@@ -1290,7 +1290,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
                     c_ddep_macrn%fld = fillreal
                     c_ddep_macrn%fldname = 'ddep_macrn'
-                    c_ddep_macrn%long_name = 'methacrolein nitrate dry deposition rate'
+                    c_ddep_macrn%long_name = 'methacrolein nitrate dry deposition velocity'
                     c_ddep_macrn%units = 'cm s-1'
                     c_ddep_macrn%fillvalue = fillreal
                     c_ddep_macrn%dimnames(1) = 'nlon'
@@ -1307,7 +1307,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
                     c_ddep_mvkn%fld = fillreal
                     c_ddep_mvkn%fldname = 'ddep_mvkn'
-                    c_ddep_mvkn%long_name = 'methylvinylketone nitrate dry deposition rate'
+                    c_ddep_mvkn%long_name = 'methylvinylketone nitrate dry deposition velocity'
                     c_ddep_mvkn%units = 'cm s-1'
                     c_ddep_mvkn%fillvalue = fillreal
                     c_ddep_mvkn%dimnames(1) = 'nlon'
@@ -1324,7 +1324,7 @@ CONTAINS
                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
                     c_ddep_isnp%fld = fillreal
                     c_ddep_isnp%fldname = 'ddep_isnp'
-                    c_ddep_isnp%long_name = 'isnp dry deposition rate'
+                    c_ddep_isnp%long_name = 'isnp dry deposition velocity'
                     c_ddep_isnp%units = 'cm s-1'
                     c_ddep_isnp%fillvalue = fillreal
                     c_ddep_isnp%dimnames(1) = 'nlon'
