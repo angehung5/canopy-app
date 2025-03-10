@@ -302,14 +302,18 @@ Otherwise, please contact Patrick.C.Campbell@noaa.gov for other GFSv16 data peri
 | `modlays`       | number of model (below and above canopy) layers. Strongly recommend adjusting this in accordance with `modres` option below to maintain canopy model column extension above tallest canopies in simulation domain (e.g.,for a 50 meter column simulation, a user could use 1000 modlays @ 0.05 m resolution,  100 modlays @ 0.5 m resolution, 50 modlays @ 1.0 m resolution, etc.                                     |
 | `modres`        | above and below canopy model vertical resolution (m)                               |
 |                 | **Contiguous canopy model thresholds**                                             |
-| `lai_thresh`    | user-set real value of LAI threshold for contiguous canopy (m2/m2)                 |
-| `cf_thresh`     | user-set real value of canopy fraction threshold for contiguous canopy             |
-| `ch_thresh`     | user-set real value of canopy height threshold for contiguous canopy (m)          |
+| `lai_thresh`    | user-set real value of LAI threshold for contiguous canopy (m2/m2).  Note:  Only applies for valid vegetated land use types (forests,ssg, crops, wetlands)                 |
+| `cf_thresh`     | user-set real value of canopy fraction threshold for contiguous canopy. Note:  Only applies for valid vegetated land use types (forests,ssg, crops, wetlands)             |
+| `ch_thresh`     | user-set real value of canopy height threshold for contiguous canopy (m). Note:  Only applies for valid vegetated land use types (forests,ssg, crops, wetlands)          |
 |                 | **Canopy crop and shrub/savanna/grass extension options**                          |
 | `ssg_opt`       | integer for using either input data  (= `0`, default) or user set shrub/savanna/grass (SSG) vegetation type heights from namelist (= `1`).  Currently, GEDI FCH input data may not provide canopy heights for very low-lying vegetation such as SSG, and thus FCH=0.  This is important for options such as biogenic emissions, as this would then not have any emissions for these areas.  Warning: use of ssg_opt=1 will overide potential observations of FCH from GEDI for low-lying SSG (at higher spatial resolution) and cover larger areas of lower resolution vegtype data indicating SSG.  |
-| `ssg_set`       | user-set real value of constant SSG vegetation type heights (m) (only used if `ssg_opt=1`).  We recommend setting this to a low value, e.g., ssg_set=0.5 or 1.0 (meters) when `ssg_opt=1` |
+| `ssg_chset`     | user-set real value of constant SSG vegetation type heights (m) (only used if `ssg_opt=1`).  We recommend setting this to a low value, e.g., ssg_set=0.5 or 1.0 (meters) when `ssg_opt=1` |
+| `ssg_cfset`     | user-set real value of constant SSG vegetation fraction (only used if `ssg_opt=1`). |
+| `ssg_laiset`     | user-set real value of constant SSG LAI (only used if `ssg_opt=1`). |
 | `crop_opt`      | integer for using either input data  (= `0`, default) or user set crop vegetation type heights from namelist (= `1`).  Currently, GEDI FCH input data only provides canopy heights for forests and not crops.  Warning: use of crop_opt=1 will overide typically higher resolution input data (e.g., GEDI) forest canopy heights where the lower resolution vegtype data indicates crops  |
-| `crop_set`      | user-set real value of constant crop vegetation type heights (m) (only used if `crop_opt=1`) |
+| `crop_chset`    | user-set real value of constant crop vegetation type heights (m) (only used if `crop_opt=1`) |
+| `crop_cfset`    | user-set real value of constant crop vegetation fraction (only used if `crop_opt=1`) |
+| `crop_laiset`    | user-set real value of constant crop LAI (only used if `crop_opt=1`) |
 |                 | **Canopy physics and wind-specific options**                                       |
 | `ifcanwind`     | logical canopy wind option (default: `.FALSE.`)                                    |
 | `href_opt`      | integer for using `href_set` in namelist (= `0`, default) or array from file (= `1`) |

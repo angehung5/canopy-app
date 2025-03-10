@@ -103,8 +103,8 @@ contains
         INTEGER,     INTENT( IN )       :: CHEMMECHGAS_OPT    ! Select chemical mechanism
         INTEGER,     INTENT( IN )       :: CHEMMECHGAS_TOT    ! Select chemical mechanism gas species list
         REAL(RK),    INTENT( IN )       :: TEMPSOIL           ! soil temperature in topsoil (K)
-        REAL(RK),    INTENT( IN )       :: PRESSA(:)          ! Ambient Pressure profile in canopy [mb]
-        REAL(RK),    INTENT( IN )       :: UBAR(:)            ! Mean above/in-canopy wind speed [m/s]
+        REAL(RK),    INTENT( IN )       :: PRESSA             ! Ambient Pressure just above surface [mb]
+        REAL(RK),    INTENT( IN )       :: UBAR               ! Mean wind speed just above surface [m/s]
         INTEGER,     INTENT( IN )       :: SOCAT              ! input soil category datset used
         INTEGER,     INTENT( IN )       :: SOTYP              ! input soil type integer associated with soilcat
         REAL(RK),    INTENT( IN )       :: DSOIL              ! depth of topsoil (cm)
@@ -117,15 +117,16 @@ contains
         real(rk)                        :: rsoill             ! resistance to diffusion thru soil pore space for chemical species (s/cm)
         real(rk)                        :: rbg                ! ground boundary layer resistance (s/cm)
 
-        mdiffl = MolecDiff(CHEMMECHGAS_OPT,CHEMMECHGAS_TOT,DEP_IND,TEMPSOIL,PRESSA(1))  !Use soil temperature and pressure
+        mdiffl = MolecDiff(CHEMMECHGAS_OPT,CHEMMECHGAS_TOT,DEP_IND,TEMPSOIL,PRESSA)  !Use soil temperature and pressure
 
         rsoill = SoilResist(mdiffl,SOCAT,SOTYP,DSOIL,STHETA)
 
-        rbg = SoilRbg(UBAR(2)*100.0_rk) !convert wind to cm/s   !Rbg(ground boundary layer resistance, s/cm)
+        rbg = SoilRbg(UBAR*100.0_rk) !convert wind to cm/s   !Rbg(ground boundary layer resistance, s/cm)
         !Rbg is invariant to species not layers
         !Must use second model layer as physically correct no-slip boundary condition is applied for wind speed at z = 0
 
-        DEP_OUT = 1.0/(rbg+rsoill)                               !deposition velocity to ground surface under canopy (cm/s)
+        DEP_OUT = 1.0/(rbg+rsoill)                               !deposition velocity to ground surface under canopy or outside of
+        !canopy, e.g., barren land (cm/s)
 
         return
     END SUBROUTINE CANOPY_GAS_DRYDEP_SOIL

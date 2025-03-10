@@ -26,7 +26,8 @@ SUBROUTINE canopy_readnml
         flameh_opt, flameh_cal, flameh_set, frp_fac, ifcanwind, &
         ifcanwaf, ifcaneddy, ifcanphot, ifcanbio, ifcanddepgas, pai_opt, pai_set, lu_opt, &
         z0_opt, dx_opt, dx_set, lai_thresh, cf_thresh, ch_thresh, rsl_opt, bio_cce, &
-        biospec_opt, biovert_opt, ssg_opt, ssg_set, crop_opt, crop_set, co2_opt, co2_set, &
+        biospec_opt, biovert_opt, ssg_opt, ssg_chset, ssg_cfset, ssg_laiset, &
+        crop_opt, crop_chset, crop_cfset, crop_laiset, co2_opt, co2_set, &
         leafage_opt, lai_tstep, soim_opt, soild1, soild2, soild3, soild4, aq_opt, w126_set, &
         ht_opt, lt_opt, hw_opt, hist_opt, loss_opt, loss_set, loss_ind, lifetime, &
         ddepspecgas_opt, chemmechgas_opt, chemmechgas_tot, soilcat_opt, hyblev1
@@ -264,7 +265,17 @@ SUBROUTINE canopy_readnml
 
 !-------------------------------------------------------------------------------
 ! Set default value for shrubs/savanaa/grasslands vegtype heights used in model (m) (Default = 1 m)
-    ssg_set = 1.0_rk
+    ssg_chset = 1.0_rk
+!-------------------------------------------------------------------------------
+
+!-------------------------------------------------------------------------------
+! Set default value for shrubs/savanaa/grasslands vegfrac used in model (Default = 0.5)
+    ssg_cfset = 0.5_rk
+!-------------------------------------------------------------------------------
+
+!-------------------------------------------------------------------------------
+! Set default value for shrubs/savanaa/grasslands LAI used in model (Default = 0.5)
+    ssg_laiset = 0.1_rk
 !-------------------------------------------------------------------------------
 
 !-------------------------------------------------------------------------------
@@ -274,7 +285,17 @@ SUBROUTINE canopy_readnml
 
 !-------------------------------------------------------------------------------
 ! Set default value for crop vegtype heights used in model (m) (Default = 3 m)
-    crop_set = 3.0_rk
+    crop_chset = 3.0_rk
+!-------------------------------------------------------------------------------
+
+!-------------------------------------------------------------------------------
+! Set default value for crop vegfrac used in model (Default = 0.5)
+    crop_cfset = 0.5_rk
+!-------------------------------------------------------------------------------
+
+!-------------------------------------------------------------------------------
+! Set default value for crop LAI used in model (Default = 0.1)
+    crop_laiset = 0.1_rk
 !-------------------------------------------------------------------------------
 
 !-------------------------------------------------------------------------------
