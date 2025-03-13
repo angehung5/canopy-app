@@ -117,9 +117,10 @@ contains
         real(rk)                        :: rsoill             ! resistance to diffusion thru soil pore space for chemical species (s/cm)
         real(rk)                        :: rbg                ! ground boundary layer resistance (s/cm)
 
+
         mdiffl = MolecDiff(CHEMMECHGAS_OPT,CHEMMECHGAS_TOT,DEP_IND,TEMPSOIL,PRESSA)  !Use soil temperature and pressure
 
-        rsoill = SoilResist(mdiffl,SOCAT,SOTYP,DSOIL,STHETA)
+        rsoill = SoilResist(mdiffl,SOCAT,SOTYP,DSOIL,STHETA) !Depends on soil type, depth, and moisture
 
         rbg = SoilRbg(UBAR*100.0_rk) !convert wind to cm/s   !Rbg(ground boundary layer resistance, s/cm)
         !Rbg is invariant to species not layers
@@ -130,5 +131,37 @@ contains
 
         return
     END SUBROUTINE CANOPY_GAS_DRYDEP_SOIL
+
+    SUBROUTINE CANOPY_GAS_DRYDEP_SNOW( CHEMMECHGAS_OPT,CHEMMECHGAS_TOT, UBAR, DEP_IND, DEP_OUT)
+
+        use canopy_const_mod,  ONLY: rk                       !constants for canopy models
+        use canopy_utils_mod,  ONLY: ReactivityParamHNO3, SoilRbg
+
+        INTEGER,     INTENT( IN )       :: CHEMMECHGAS_OPT    ! Select chemical mechanism
+        INTEGER,     INTENT( IN )       :: CHEMMECHGAS_TOT    ! Select chemical mechanism gas species list
+        REAL(RK),    INTENT( IN )       :: UBAR               ! Mean wind speed just above surface [m/s]
+
+        INTEGER,     INTENT( IN )       :: DEP_IND            ! Gas deposition species index (depends on gas mech)
+        REAL(RK),    INTENT( OUT )      :: DEP_OUT            ! Output soil layer gas dry deposition rate for each DEP_IND
+
+        real(rk), parameter             :: ar_0   = 8.0       ! used to scale other species to HNO3 (dimensionless)
+        real(rk)                        :: ar_l               ! reactivity denominator relative to HNO3 for each species (dimensionless)
+        real(rk), parameter             :: rsnow0 = 100.0     ! resistance to deposition to snow (cm/s) based on Helmig et al.
+        real(rk)                        :: rsnowl             ! resistance to diffusion thru snow space for chemical species (s/cm)
+        real(rk)                        :: rbg                ! ground boundary layer resistance (s/cm)
+
+        ar_l = ReactivityParamHNO3(CHEMMECHGAS_OPT,CHEMMECHGAS_TOT,DEP_IND)
+
+        rsnowl = rsnow0 * (ar_0/ar_l)  !Based on CMAQv5.3.1 formulation scaled to reactivity relative to HNO3
+
+        rbg = SoilRbg(UBAR*100.0_rk) !convert wind to cm/s   !Rbg(ground boundary layer resistance, s/cm)
+        !Rbg is invariant to species not layers
+        !Must use second model layer as physically correct no-slip boundary condition is applied for wind speed at z = 0
+
+        DEP_OUT = 1.0/(rbg+rsnowl)                               !deposition velocity to ground surface under canopy or outside of
+        !canopy, e.g., barren land (cm/s) when snow cover is present
+
+        return
+    END SUBROUTINE CANOPY_GAS_DRYDEP_SNOW
 
 end module canopy_drydep_mod

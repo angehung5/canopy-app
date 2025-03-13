@@ -3518,6 +3518,16 @@ CONTAINS
             variables_2d%tmp_hyblev1=variables_2d_real
             !Also reshape to 1D array for 1D calculation and output
 !            variables%tmp_hyblev1=reshape(variables_2d%tmp_hyblev1,[size(variables_2d%tmp_hyblev1)])
+            !Average percent snow cover at ground
+            CALL get_var_2d_real_cdf (cdfid, 'snowc_ave', variables_2d_real, it, rcode)
+            IF ( rcode /= nf90_noerr ) THEN
+                WRITE (*,f9410) TRIM(pname), 'snowc_ave',  &
+                    TRIM(nf90_strerror(rcode))
+                CALL exit(2)
+            ENDIF
+            variables_2d%snowc_ave=variables_2d_real
+            !Also reshape to 1D array for 1D calculation and output
+!            variables%snowc_ave=reshape(variables_2d%snowc_ave,[size(variables_2d%snowc_ave)])
 
             !3D Input Level Profile
             if (var3d_opt .eq. 1) then

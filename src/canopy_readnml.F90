@@ -30,7 +30,7 @@ SUBROUTINE canopy_readnml
         crop_opt, crop_chset, crop_cfset, crop_laiset, co2_opt, co2_set, &
         leafage_opt, lai_tstep, soim_opt, soild1, soild2, soild3, soild4, aq_opt, w126_set, &
         ht_opt, lt_opt, hw_opt, hist_opt, loss_opt, loss_set, loss_ind, lifetime, &
-        ddepspecgas_opt, chemmechgas_opt, chemmechgas_tot, soilcat_opt, hyblev1
+        ddepspecgas_opt, chemmechgas_opt, chemmechgas_tot, soilcat_opt, hyblev1, snowc_set
 
 
 !-------------------------------------------------------------------------------
@@ -417,6 +417,11 @@ SUBROUTINE canopy_readnml
 !-------------------------------------------------------------------------------
 ! Set default value for input height of 1st hybrid model layer above ground  (meters)
     hyblev1 = 20.0_rk
+!-------------------------------------------------------------------------------
+
+!-------------------------------------------------------------------------------
+! !Set default snow cover percent at grid/point, above which ground surface is treated as dominant snow (%)
+    snowc_set = 50.0_rk
 !-------------------------------------------------------------------------------
 
 !-------------------------------------------------------------------------------

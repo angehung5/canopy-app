@@ -13,7 +13,8 @@ module canopy_utils_mod
         CalcRelHum,CalcSpecHum,CalcCair,Convert_qh_to_h2o, &
         SetMolecDiffSTP,MolecDiff,rs_zhang_gas,rbl,rcl,rml, &
         SetEffHenrysLawCoeffs,SetReactivityParams,ReactivityParam, &
-        EffHenrysLawCoeff,SoilResist,SoilRbg
+        EffHenrysLawCoeff,SoilResist,SoilRbg,ReactivityParamHNO3, &
+        SetReactivityHNO3
 
 contains
 
@@ -1646,5 +1647,55 @@ contains
         end if
         return
     end subroutine SetReactivityParams
+
+!==========================================================================
+!function ReactivityHNO3 - calculate relative reactivity parameters to HNO3  (dimensionless)
+!==========================================================================
+    function ReactivityParamHNO3(chemmechgas_opt,chemmechgas_tot,ispec)
+        integer, intent(in)        :: chemmechgas_opt,chemmechgas_tot ! chemical mechanism and total gas species including transported
+        integer, intent(in)        :: ispec   !dummy id for species
+        real(rk)                   :: ReactivityParamHNO3
+        real(rk),dimension(chemmechgas_tot) :: ar
+
+        call SetReactivityHNO3(chemmechgas_opt,chemmechgas_tot,ar)
+        ReactivityParamHNO3 = ar(ispec)
+
+        return
+    end function ReactivityParamHNO3
+
+!========================================================
+!function ar - set reactivity relative to HNO3 for all species
+!
+!source - reactivity relative to HNO3 -- CMAQv5.3.1 Model
+!========================================================
+    subroutine SetReactivityHNO3(chemmechgas_opt,chemmechgas_tot,ar)
+!    integer(kind=i4)                              :: l               !l is species
+        integer, intent(in)                             :: chemmechgas_opt,chemmechgas_tot ! chemical mechanism and total gas species including transported
+        real(rk),dimension(chemmechgas_tot),intent(out) :: ar
+
+        if (chemmechgas_opt .eq. 0) then !RACM2
+            !Insert MolecDiffSTP Coefficients for RACM2_plus mechanism
+            !species in array are:
+            != (/NO,   NO2,    O3,  HONO,  HNO4,   HNO3,   N2O5,     CO,  H2O2,  CH4,
+            !MO2,   OP1,   MOH,   NO3,   O3P,    O1D,     HO,    HO2,  ORA1,  HAC,
+            !PAA, DHMOB, HPALD,  ISHP, IEPOX, PROPNN, ISOPNB, ISOPND, MACRN, MVKN,
+            !ISNP /)
+            if (chemmechgas_tot .gt. 31) then ! too many species defined
+                write(*,*)  'Too many species of ', chemmechgas_tot, ' in namelist for this chemmechgas_opt....exiting'
+                write(*,*)  'Set chemmechgas_tot < 31'
+                call exit(2)
+            else
+                ar = (/2.0, 2.0, 12.0, 20.0, 1.0, 8000.0, 5000.0, 5.0, 34000.0, 2.0,  &
+                    10.0, 10.0, 2.0, 5000.0, 12.0, 12.0, 10.0, 10.0, 20.0, 20.0,  &
+                    20.0, 10.0, 10.0, 10.0, 8.0, 16.0, 16.0, 16.0, 8.0, 16.0,  &
+                    16.0 /)
+            end if
+        else
+            write(*,*)  'Wrong chemical mechanism option of ', chemmechgas_opt, ' in namelist...exiting'
+            write(*,*)  'Set chemmechgas_opt to only 0 (RACM2) for now'
+            call exit(2)
+        end if
+        return
+    end subroutine SetReactivityHNO3
 
 end module canopy_utils_mod

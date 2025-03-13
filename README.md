@@ -206,6 +206,7 @@ The Canopy-App input data in [Table 2](#table-2-canopy-app-required-input-variab
 | `spfh2m`                         | 2-meter specific humidity (kg/kg)           | UFS NOAA/GFSv16                                    |
 | `hpbl`                           | Height of the planetary boundary layer (m)  | UFS NOAA/GFSv16                                    |
 | `prate_ave`                      | Average mass precipitation rate (kg m-2 s-1) | UFS NOAA/GFSv16                                   |
+| `snowc_ave`                      | Average percent snow cover (%)               | UFS NOAA/GFSv16                                   |
 | `soilw1`                         | Volumetric soil moisture in layer 1 (m3 m-3) | UFS NOAA/GFSv16                                   |
 | `soilw2`                         | Volumetric soil moisture in layer 2 (m3 m-3) | UFS NOAA/GFSv16                                   |
 | `soilw3`                         | Volumetric soil moisture in layer 3 (m3 m-3) | UFS NOAA/GFSv16                                   |
@@ -296,7 +297,7 @@ Otherwise, please contact Patrick.C.Campbell@noaa.gov for other GFSv16 data peri
 | `var3d_opt`     | integer for selecting to use 3D variable in NetCDF file (e.g., 'PAVD') or to read supplementary canopy text file inputs (`file_canvars`).  (= `0`, default, off) or (= `1`, on). `file_canvars` read only when `infmt_opt` = 1 and `var3d_opt` = 1.  This is used with the number of levels defined by `var3d_set` below |
 | `var3d_set`     | integer for selecting number of 3D input levels, only used when setting `var3d_opt= `1`, default = 14 (Note:  For input text file the max current levels can only be 14, please input according to example data)  |
 |                 | **Options to use observed PAVD profiles and latitude threshold                 |
-| `pavd_opt`      | integer for choosing to use GEDI 3D input PAVD profiles instead of prescribed plant distribution functions (= `0`, default, off) or (= `1`, on);  Note: To use this option, must set `var3d_set= `1`, and the 3D pavd variable must be available in the input NetCDF file (i.e., `file_vars`) or in new auxilliary 3D PAVD text file  |
+| `pavd_opt`      | integer for choosing to use GEDI 3D input PAVD profiles instead of prescribed plant distribution functions (= `0`, default, off) or (= `1`, on);  Note: To use this option, must set `var3d_opt= `1`, and the 3D pavd variable must be available in the input NetCDF file (i.e., `file_vars`) or in new auxilliary 3D PAVD text file  |
 | `pavd_set`      | real value for +/- latitude threshold within to use observed GEDI 3D PAVD profiles instead of prescribed plant distribution functions.  Used only if `pavd_opt=1`.  Default  = 52.0 degrees latitude.   |
 |                 | **Canopy model vertical layers**                                                   |
 | `modlays`       | number of model (below and above canopy) layers. Strongly recommend adjusting this in accordance with `modres` option below to maintain canopy model column extension above tallest canopies in simulation domain (e.g.,for a 50 meter column simulation, a user could use 1000 modlays @ 0.05 m resolution,  100 modlays @ 0.5 m resolution, 50 modlays @ 1.0 m resolution, etc.                                     |
@@ -363,6 +364,7 @@ Otherwise, please contact Patrick.C.Campbell@noaa.gov for other GFSv16 data peri
 | `chemmechgas_opt`   | user set option to select gas chemical mechanism and gas species mapping including transported species.  (`0`: Default = RACM2 mechanism; Only option currently).
 | `chemmechgas_tot`   | user set option to define total number of gas species in select gas chemical mechanism (`chemmechgas_opt`) including transported species.  (`31`: Default = RACM2 mechanism; Only option currently).
 | `hyblev1`   | user set real value of approximate height AGL of input 1st hybrid model layer associated with input `tmp_hyblev1` ( Default = 20 meters associated with GFSv16; Best used to approximate constant ambient temperature lapse rate with `tmp2m`, particularly in global appliations with areas of extreme soil or skin/surface temperature gradients).
+| `snowc_set`      | Set default value for threshold percent snow cover, above which grid/point at ground is treated as dominant covered by snow  (Default = 50%) |
 
 **\*\*** If `modres` >> `flameh` then some error in WAF calculation will be incurred.  Suggestion is to use relative fine `modres` (at least <= 0.5 m) compared to average flame heights (e.g., ~ 1.0 m) if WAF is required.
 
