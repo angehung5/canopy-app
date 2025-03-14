@@ -48,6 +48,7 @@ MODULE canopy_canmet_mod
         real(rk)   :: soilt4       !soil temperature level 4 (K)
         real(rk)   :: tmp_hyblev1  !1st model layer air temperature above ground (K)
         real(rk)   :: snowc_ave    !average percent ground snow cover (%)
+        real(rk)   :: icec         !average fraction ground or water ice cover
     end TYPE variable_type
 
     type(variable_type), allocatable :: variables( : ), variables_2d( : , :)
@@ -140,6 +141,7 @@ MODULE canopy_canmet_mod
     real(rk)       ::    soilt4ref       !soil temperature level 4 (K)
     real(rk)       ::    tmp_hyblev1ref  !1st model layer air temperature above ground (K)
     real(rk)       ::    snowc_averef    !average percent ground snow cover (%)
+    real(rk)       ::    icec_averef     !average fraction ground or water ice cover
 
 !    real(rk)       ::    lev01ref, lev02ref, lev03ref, lev04ref, lev05ref, & !Input canopy profile levels
 !                         lev06ref, lev07ref, lev08ref, lev09ref, lev10ref, &

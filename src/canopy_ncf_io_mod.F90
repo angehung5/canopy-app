@@ -3528,6 +3528,16 @@ CONTAINS
             variables_2d%snowc_ave=variables_2d_real
             !Also reshape to 1D array for 1D calculation and output
 !            variables%snowc_ave=reshape(variables_2d%snowc_ave,[size(variables_2d%snowc_ave)])
+            !Average fraction ice cover at ground or water
+            CALL get_var_2d_real_cdf (cdfid, 'icec', variables_2d_real, it, rcode)
+            IF ( rcode /= nf90_noerr ) THEN
+                WRITE (*,f9410) TRIM(pname), 'icec',  &
+                    TRIM(nf90_strerror(rcode))
+                CALL exit(2)
+            ENDIF
+            variables_2d%icec=variables_2d_real
+            !Also reshape to 1D array for 1D calculation and output
+!            variables%icec=reshape(variables_2d%icec,[size(variables_2d%icec)])
 
             !3D Input Level Profile
             if (var3d_opt .eq. 1) then

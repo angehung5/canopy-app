@@ -74,4 +74,5 @@ MODULE canopy_canopts_mod
     integer             ::    soilcat_opt  !Set default integer value to select soil category option (0, STATSGO/FAO)!
     real(rk)            ::    hyblev1      !Set default approximate input height of 1st hybrid model layer above ground (used for temp lapse rate approximation) (default=20.0 meters)
     real(rk)            ::    snowc_set    !Set default snow cover percent at grid/point, above which ground surface is treated as dominant snow (default = 50%)
+    real(rk)            ::    icec_set     !Set default ice cover percent at grid/point, above which ground or water surface is treated as dominant ice (default = 50%)
 END MODULE canopy_canopts_mod

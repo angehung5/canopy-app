@@ -102,4 +102,5 @@
 ! soild1          = 5.0 needed here too, but defined above
   hyblev1         = 20.0
   snowc_set       = 50.0
+  icec_set        = 50.0
 /
