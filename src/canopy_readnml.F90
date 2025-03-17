@@ -26,12 +26,13 @@ SUBROUTINE canopy_readnml
         flameh_opt, flameh_cal, flameh_set, frp_fac, ifcanwind, &
         ifcanwaf, ifcaneddy, ifcanphot, ifcanbio, ifcanddepgas, pai_opt, pai_set, lu_opt, &
         z0_opt, dx_opt, dx_set, lai_thresh, cf_thresh, ch_thresh, rsl_opt, bio_cce, &
-        biospec_opt, biovert_opt, ssg_opt, ssg_chset, ssg_cfset, ssg_laiset, &
+        biospec_opt, biovert_opt, can_opt, can_chset, can_cfset, can_laiset, &
+        ssg_opt, ssg_chset, ssg_cfset, ssg_laiset, &
         crop_opt, crop_chset, crop_cfset, crop_laiset, co2_opt, co2_set, &
         leafage_opt, lai_tstep, soim_opt, soild1, soild2, soild3, soild4, aq_opt, w126_set, &
         ht_opt, lt_opt, hw_opt, hist_opt, loss_opt, loss_set, loss_ind, lifetime, &
         ddepspecgas_opt, chemmechgas_opt, chemmechgas_tot, soilcat_opt, hyblev1, snowc_set, &
-        icec_set
+        icec_set, gamma_set
 
 
 !-------------------------------------------------------------------------------
@@ -260,6 +261,26 @@ SUBROUTINE canopy_readnml
 !-------------------------------------------------------------------------------
 
 !-------------------------------------------------------------------------------
+! Set default integer for canopy vegtype option from GEDI or user (default = 0)
+    can_opt = 0
+!-------------------------------------------------------------------------------
+
+!-------------------------------------------------------------------------------
+! Set default value for canopy vegtype heights used in model (m) (Default = 10 m)
+    can_chset = 10.0_rk
+!-------------------------------------------------------------------------------
+
+!-------------------------------------------------------------------------------
+! Set default value for canopy vegfrac used in model (Default = 0.5)
+    can_cfset = 0.5_rk
+!-------------------------------------------------------------------------------
+
+!-------------------------------------------------------------------------------
+! Set default value for canopy LAI used in model (Default = 4.0)
+    can_laiset = 4.0_rk
+!-------------------------------------------------------------------------------
+
+!-------------------------------------------------------------------------------
 ! Set default integer for shrubs/savanaa/grasslands vegtype option from GEDI or user (default = 0)
     ssg_opt = 0
 !-------------------------------------------------------------------------------
@@ -428,6 +449,11 @@ SUBROUTINE canopy_readnml
 !-------------------------------------------------------------------------------
 ! !Set default ice cover percent at grid/point, above which ground or water surface is treated as dominant ice (%)
     icec_set = 50.0_rk
+!-------------------------------------------------------------------------------
+
+!-------------------------------------------------------------------------------
+! !Set default reaction probability for gas dry deposition to different building surfaces (default = 5.0D-5)
+    gamma_set = 5.0D-5
 !-------------------------------------------------------------------------------
 
 !-------------------------------------------------------------------------------

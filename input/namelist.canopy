@@ -38,12 +38,16 @@
   lai_thresh  =  0.1
   cf_thresh   =  0.1
   ch_thresh   =  0.5
-!Canopy crop and shrub/savanna/grass extension options
-  crop_opt    =  1
+!Canopy, crop, and shrub/savanna/grass extension options
+  can_opt     =  0
+  can_laiset  =  4.0
+  can_cfset   =  0.5
+  can_chset   =  10.0
+  crop_opt    =  0
   crop_laiset =  0.2
   crop_cfset  =  0.2
   crop_chset  =  3.0
-  ssg_opt     =  1
+  ssg_opt     =  0
   ssg_laiset  =  0.2
   ssg_cfset   =  0.2
   ssg_chset   =  1.0
@@ -103,4 +107,5 @@
   hyblev1         = 20.0
   snowc_set       = 50.0
   icec_set        = 50.0
+  gamma_set       = 5.0D-5
 /

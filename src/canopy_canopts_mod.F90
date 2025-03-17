@@ -41,6 +41,10 @@ MODULE canopy_canopts_mod
     real(rk)            ::    bio_cce      !MEGAN biogenic emission canopy environment coefficient.
     integer             ::    biospec_opt  !Set default integer for species output option (default = 0, all)
     integer             ::    biovert_opt  !MEGAN vertical integration of emissions option (default = 0, off)
+    integer             ::    can_opt      !Set default integer for canopy option from GEDI or user (default = 0)
+    real(rk)            ::    can_chset    !Set default value for canopy vegtype heights used in model (m) (Default = 1 m)
+    real(rk)            ::    can_cfset    !Set default value for canopy vegfrac used in model (m) (Default = 0.5)
+    real(rk)            ::    can_laiset   !Set default value for canopy LAI used in model (Default = 0.1)
     integer             ::    ssg_opt      !Set default integer for shrubs/savanna/grassland vegtype option from GEDI or user (default = 0)
     real(rk)            ::    ssg_chset    !Set default value for shrubs/savanna/grassland vegtype heights used in model (m) (Default = 1 m)
     real(rk)            ::    ssg_cfset    !Set default value for shrubs/savanna/grassland vegfrac used in model (m) (Default = 0.5)
@@ -75,4 +79,5 @@ MODULE canopy_canopts_mod
     real(rk)            ::    hyblev1      !Set default approximate input height of 1st hybrid model layer above ground (used for temp lapse rate approximation) (default=20.0 meters)
     real(rk)            ::    snowc_set    !Set default snow cover percent at grid/point, above which ground surface is treated as dominant snow (default = 50%)
     real(rk)            ::    icec_set     !Set default ice cover percent at grid/point, above which ground or water surface is treated as dominant ice (default = 50%)
+    real(rk)            ::    gamma_set    !Set default reaction probability for gas dry deposition to different building surfaces (default = 5.0D-5)
 END MODULE canopy_canopts_mod

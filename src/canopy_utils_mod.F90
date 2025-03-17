@@ -14,7 +14,7 @@ module canopy_utils_mod
         SetMolecDiffSTP,MolecDiff,rs_zhang_gas,rbl,rcl,rml, &
         SetEffHenrysLawCoeffs,SetReactivityParams,ReactivityParam, &
         EffHenrysLawCoeff,SoilResist,SoilRbg,ReactivityParamHNO3, &
-        SetReactivityHNO3
+        SetReactivityHNO3,MolarMassGas,SetMolarMassGas
 
 contains
 
@@ -1697,5 +1697,56 @@ contains
         end if
         return
     end subroutine SetReactivityHNO3
+
+!==========================================================================
+!function Molar Mass - set molar mass for gas species  (dimensionless)
+!==========================================================================
+    function MolarMassGas(chemmechgas_opt,chemmechgas_tot,ispec)
+        integer, intent(in)        :: chemmechgas_opt,chemmechgas_tot ! chemical mechanism and total gas species including transported
+        integer, intent(in)        :: ispec   !dummy id for species
+        real(rk)                   :: MolarMassGas !Molar Mass of Gases (kg/mol)
+        real(rk),dimension(chemmechgas_tot) :: mmg
+
+        call SetMolarMassGas(chemmechgas_opt,chemmechgas_tot,mmg)
+        MolarMassGas = mmg(ispec)
+
+        return
+    end function MolarMassGas
+
+!========================================================
+!function mmg - set Molar Mass for all gas species
+!
+!source - Molar Mass for Gas Species -
+!========================================================
+    subroutine SetMolarMassGas(chemmechgas_opt,chemmechgas_tot,mmg)
+!    integer(kind=i4)                              :: l               !l is species
+        integer, intent(in)                             :: chemmechgas_opt,chemmechgas_tot ! chemical mechanism and total gas species including transported
+        real(rk),dimension(chemmechgas_tot),intent(out) :: mmg  !Molar Mass of Gases (kg/mol)
+
+        if (chemmechgas_opt .eq. 0) then !RACM2
+            !Insert MolecDiffSTP Coefficients for RACM2_plus mechanism
+            !species in array are:
+            != (/NO,   NO2,    O3,  HONO,  HNO4,   HNO3,   N2O5,     CO,  H2O2,  CH4,
+            !MO2,   OP1,   MOH,   NO3,   O3P,    O1D,     HO,    HO2,  ORA1,  HAC,
+            !PAA, DHMOB, HPALD,  ISHP, IEPOX, PROPNN, ISOPNB, ISOPND, MACRN, MVKN,
+            !ISNP /)
+            if (chemmechgas_tot .gt. 31) then ! too many species defined
+                write(*,*)  'Too many species of ', chemmechgas_tot, ' in namelist for this chemmechgas_opt....exiting'
+                write(*,*)  'Set chemmechgas_tot < 31'
+                call exit(2)
+            else
+                mmg = (/0.03001, 0.046055, 0.048, 0.047013, 0.079012, 0.06301, 0.10801, 0.02801, 0.0340147, 0.01604,  &
+                    0.0470333, 0.048041, 0.03204, 0.0620049, 0.032, 0.032, 0.01701, 0.01801528, 0.04603, 0.06052,  &
+                    0.0760514, 0.06052, 0.10012, 0.14717, 0.118, 0.11908, 0.147, 0.12911, 0.0709, 0.0709,  &
+                    0.0709 /)
+            end if
+        else
+            write(*,*)  'Wrong chemical mechanism option of ', chemmechgas_opt, ' in namelist...exiting'
+            write(*,*)  'Set chemmechgas_opt to only 0 (RACM2) for now'
+            call exit(2)
+        end if
+        return
+    end subroutine SetMolarMassGas
+
 
 end module canopy_utils_mod

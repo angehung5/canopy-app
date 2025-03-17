@@ -134,20 +134,72 @@ SUBROUTINE canopy_calcs(nn)
 
 ! ... check for valid model vegetation types
                 if (lu_opt .eq. 0 .or. lu_opt .eq. 1 ) then !VIIRS or MODIS
-                    if (vtyperef .gt. 0 .and. vtyperef .le. 10 .or. vtyperef .eq. 12 &
+                    if (vtyperef .gt. 0 .and. vtyperef .le. 12 &
                         .or. vtyperef .eq. 14 .or. vtyperef .eq. 18 &
                         .or. vtyperef .eq. 19) then
 
+! ... check for can_opt from user namelist
+
+                        if (vtyperef .ge. 1 .and. vtyperef .le. 5 &
+                            .or. vtyperef .eq. 18 .or. vtyperef .eq. 19) then !!VIIRS/MODIS forest/tundra canopies
+                            if (can_opt .eq. 0) then !use inputs for canopy heights
+                                hcmref = hcmref
+                                canfracref = canfracref
+                                lairef = lairef
+                            else if (can_opt .eq. 1) then !user set constant canopy heights for forests/tundras
+                                !only used to overide valid vtypes with hcm<=0, canfrac<=0, or lai<=0.
+                                if (hcmref .le. 0.0) then
+                                    hcmref = can_chset
+                                else
+                                    hcmref = hcmref
+                                endif
+                                if (canfracref .le. 0.0) then
+                                    canfracref = can_cfset
+                                else
+                                    canfracref = canfracref
+                                endif
+                                if (lairef .le. 0.0) then
+                                    lairef = can_laiset
+                                else
+                                    lairef = lairef
+                                endif
+                                !recalculate
+                                zhc         = zk/hcmref
+                                cansublays  = min(floor(hcmref/modres),modlays)
+                                if (cansublays .lt. 1) then !case where model resolution >= canopy height
+                                    cansublays=1            !only one layer allowed
+                                end if
+                            else
+                                write(*,*)  'Wrong CAN_OPT choice of ', can_opt, &
+                                    ' in namelist...exiting'
+                                call exit(2)
+                            end if
+                        end if
+
 ! ... check for ssg_opt from user namelist
-                        if (vtyperef .ge. 6 .and. vtyperef .le. 10) then !VIIRS/MODIS shrubs/savannas/grasses (SSG) type
-                            if (ssg_opt .eq. 0) then !use GEDI inputs for SSG heights (possibly not measured...)
+                        if (vtyperef .ge. 6 .and. vtyperef .le. 11) then !VIIRS/MODIS shrubs/savannas/grasses (SSG) type
+                            !includes wetlands!
+                            if (ssg_opt .eq. 0) then !use inputs for SSG (possibly not measured...)
                                 hcmref = hcmref
                                 canfracref = canfracref
                                 lairef = lairef
                             else if (ssg_opt .eq. 1) then !user set constant shrubs/savannas/grasslands height
-                                hcmref = ssg_chset
-                                canfracref = ssg_cfset
-                                lairef = ssg_laiset
+                                !only used to overide valid vtypes with hcm<=0, canfrac<=0, or lai<=0.
+                                if (hcmref .le. 0.0) then
+                                    hcmref = ssg_chset
+                                else
+                                    hcmref = hcmref
+                                endif
+                                if (canfracref .le. 0.0) then
+                                    canfracref = ssg_cfset
+                                else
+                                    canfracref = canfracref
+                                endif
+                                if (lairef .le. 0.0) then
+                                    lairef = ssg_laiset
+                                else
+                                    lairef = lairef
+                                endif
                                 !recalculate
                                 zhc         = zk/hcmref
                                 cansublays  = min(floor(hcmref/modres),modlays)
@@ -163,14 +215,27 @@ SUBROUTINE canopy_calcs(nn)
 
 ! ... check for crop_opt from user namelist
                         if (vtyperef .eq. 12 .or. vtyperef .eq. 14) then !VIIRS/MODIS crop types
-                            if (crop_opt .eq. 0) then !use GEDI inputs for crop height (possibly not measured...)
+                            if (crop_opt .eq. 0) then !use inputs for crop (possibly not measured...)
                                 hcmref = hcmref
                                 canfracref = canfracref
                                 lairef = lairef
                             else if (crop_opt .eq. 1) then !user set constant crop height
-                                hcmref = crop_chset
-                                canfracref = crop_cfset
-                                lairef = crop_laiset
+                                !only used to overide valid vtypes with hcm<=0, canfrac<=0, or lai<=0.
+                                if (hcmref .le. 0.0) then
+                                    hcmref = crop_chset
+                                else
+                                    hcmref = hcmref
+                                endif
+                                if (canfracref .le. 0.0) then
+                                    canfracref = crop_cfset
+                                else
+                                    canfracref = canfracref
+                                endif
+                                if (lairef .le. 0.0) then
+                                    lairef = crop_laiset
+                                else
+                                    lairef = lairef
+                                endif
                                 !recalculate
                                 zhc         = zk/hcmref
                                 cansublays  = min(floor(hcmref/modres),modlays)
@@ -1721,6 +1786,148 @@ SUBROUTINE canopy_calcs(nn)
                                 call exit(2)
                             end if
                         end if
+                    else if (vtyperef .eq. 13) then !Urban and Built Up
+! ... user option to calculate dry deposition velocity...for land use outside of vegetated canopies
+                        if (ifcanddepgas ) then
+                            if (chemmechgas_opt .eq. 0)  then   !RACM2
+                                if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
+                                    !urban gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,1,ddep_no_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,2,ddep_no2_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,3,ddep_o3_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,4,ddep_hono_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,5,ddep_hno4_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,6,ddep_hno3_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,7,ddep_n2o5_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,8,ddep_co_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,9,ddep_h2o2_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,10,ddep_ch4_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,11,ddep_mo2_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,12,ddep_op1_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,13,ddep_moh_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,14,ddep_no3_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 15) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,15,ddep_o3p_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,16,ddep_o1d_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,17,ddep_ho_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,18,ddep_ho2_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,19,ddep_ora1_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,20,ddep_hac_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,21,ddep_paa_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,22,ddep_dhmob_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,23,ddep_hpald_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,24,ddep_ishp_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,25,ddep_iepox_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,26,ddep_propnn_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,27,ddep_isopnb_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,28,ddep_isopnd_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,29,ddep_macrn_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,30,ddep_mvkn_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set,31,ddep_isnp_3d(i,j,1))
+                                    endif
+                                else
+                                    write(*,*)  'Wrong number of chemical species of ', chemmechgas_tot
+                                    write(*,*)  ' in namelist...exiting'
+                                    write(*,*)  'Set chemmechgas_tot = 31 for RACM2'
+                                    call exit(2)
+                                end if
+                            else
+                                write(*,*)  'Wrong chemical mechanism option of ', chemmechgas_opt, ' in namelist...exiting'
+                                write(*,*)  'Set chemmechgas_opt = 0 (RACM2) for now'
+                                call exit(2)
+                            end if
+                        end if
                     else
 !                        write(*,*)  'Warning VIIRS/MODIS VTYPE ', vtyperef, ' is not supported...continue'
                     end if   !Vegetation types
@@ -1848,20 +2055,72 @@ SUBROUTINE canopy_calcs(nn)
 
 ! ... check for valid model vegetation types
             if (lu_opt .eq. 0 .or. lu_opt .eq. 1 ) then !VIIRS or MODIS
-                if (vtyperef .gt. 0 .and. vtyperef .le. 10 .or. vtyperef .eq. 12 &
+                if (vtyperef .gt. 0 .and. vtyperef .le. 12 &
                     .or. vtyperef .eq. 14 .or. vtyperef .eq. 18 &
                     .or. vtyperef .eq. 19) then
 
+
+! ... check for can_opt from user namelist
+                    if (vtyperef .ge. 1 .and. vtyperef .le. 5 &
+                        .or. vtyperef .eq. 18 .or. vtyperef .eq. 19) then !!VIIRS/MODIS forest/tundra canopies
+                        if (can_opt .eq. 0) then !use inputs for canopy heights
+                            hcmref = hcmref
+                            canfracref = canfracref
+                            lairef = lairef
+                        else if (can_opt .eq. 1) then !user set constant canopy heights for forests/tundras
+                            !only used to overide valid vtypes with hcm<=0, canfrac<=0, or lai<=0.
+                            if (hcmref .le. 0.0) then
+                                hcmref = can_chset
+                            else
+                                hcmref = hcmref
+                            endif
+                            if (canfracref .le. 0.0) then
+                                canfracref = can_cfset
+                            else
+                                canfracref = canfracref
+                            endif
+                            if (lairef .le. 0.0) then
+                                lairef = can_laiset
+                            else
+                                lairef = lairef
+                            endif
+                            !recalculate
+                            zhc         = zk/hcmref
+                            cansublays  = min(floor(hcmref/modres),modlays)
+                            if (cansublays .lt. 1) then !case where model resolution >= canopy height
+                                cansublays=1            !only one layer allowed
+                            end if
+                        else
+                            write(*,*)  'Wrong CAN_OPT choice of ', can_opt, &
+                                ' in namelist...exiting'
+                            call exit(2)
+                        end if
+                    end if
+
 ! ... check for ssg_opt from user namelist
-                    if (vtyperef .ge. 6 .and. vtyperef .le. 10) then !VIIRS/MODIS shrubs/savannas/grasses (SSG) type
+                    if (vtyperef .ge. 6 .and. vtyperef .le. 11) then !VIIRS/MODIS shrubs/savannas/grasses (SSG) type
+                        !Includes wetlands!
                         if (ssg_opt .eq. 0) then !use GEDI inputs for SSG heights (possibly not measured...)
                             hcmref = hcmref
                             canfracref = canfracref
                             lairef = lairef
                         else if (ssg_opt .eq. 1) then !user set constant shrubs/savannas/grasslands height
-                            hcmref = ssg_chset
-                            canfracref = ssg_cfset
-                            lairef = ssg_laiset
+                            !only used to overide valid vtypes with hcm<=0, canfrac<=0, or lai<=0.
+                            if (hcmref .le. 0.0) then
+                                hcmref = ssg_chset
+                            else
+                                hcmref = hcmref
+                            endif
+                            if (canfracref .le. 0.0) then
+                                canfracref = ssg_cfset
+                            else
+                                canfracref = canfracref
+                            endif
+                            if (lairef .le. 0.0) then
+                                lairef = ssg_laiset
+                            else
+                                lairef = lairef
+                            endif
                             !recalculate
                             zhc         = zk/hcmref
                             cansublays  = min(floor(hcmref/modres),modlays)
@@ -1882,9 +2141,22 @@ SUBROUTINE canopy_calcs(nn)
                             canfracref = canfracref
                             lairef = lairef
                         else if (crop_opt .eq. 1) then !user set constant crop height
-                            hcmref = crop_chset
-                            canfracref = crop_cfset
-                            lairef = crop_laiset
+                            !only used to overide valid vtypes with hcm<=0, canfrac<=0, or lai<=0.
+                            if (hcmref .le. 0.0) then
+                                hcmref = crop_chset
+                            else
+                                hcmref = hcmref
+                            endif
+                            if (canfracref .le. 0.0) then
+                                canfracref = crop_cfset
+                            else
+                                canfracref = canfracref
+                            endif
+                            if (lairef .le. 0.0) then
+                                lairef = crop_laiset
+                            else
+                                lairef = lairef
+                            endif
                             !recalculate
                             zhc         = zk/hcmref
                             cansublays  = min(floor(hcmref/modres),modlays)
@@ -3424,6 +3696,148 @@ SUBROUTINE canopy_calcs(nn)
                                         call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
                                             ubzref,31,ddep_isnp(loc,1))
                                     end if
+                                endif
+                            else
+                                write(*,*)  'Wrong number of chemical species of ', chemmechgas_tot
+                                write(*,*)  ' in namelist...exiting'
+                                write(*,*)  'Set chemmechgas_tot = 31 for RACM2'
+                                call exit(2)
+                            end if
+                        else
+                            write(*,*)  'Wrong chemical mechanism option of ', chemmechgas_opt, ' in namelist...exiting'
+                            write(*,*)  'Set chemmechgas_opt = 0 (RACM2) for now'
+                            call exit(2)
+                        end if
+                    end if
+                else if (vtyperef .eq. 13) then !Urban and Built Up
+! ... user option to calculate dry deposition velocity...for land use outside of vegetated canopies
+                    if (ifcanddepgas ) then
+                        if (chemmechgas_opt .eq. 0)  then   !RACM2
+                            if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
+                                !urban gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,1,ddep_no(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,2,ddep_no2(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,3,ddep_o3(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,4,ddep_hono(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,5,ddep_hno4(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,6,ddep_hno3(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,7,ddep_n2o5(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,8,ddep_co(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,9,ddep_h2o2(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,10,ddep_ch4(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,11,ddep_mo2(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,12,ddep_op1(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,13,ddep_moh(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,14,ddep_no3(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 15) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,15,ddep_o3p(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,16,ddep_o1d(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,17,ddep_ho(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,18,ddep_ho2(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,19,ddep_ora1(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,20,ddep_hac(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,21,ddep_paa(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,22,ddep_dhmob(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,23,ddep_hpald(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,24,ddep_ishp(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,25,ddep_iepox(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,26,ddep_propnn(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,27,ddep_isopnb(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,28,ddep_isopnd(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,29,ddep_macrn(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,30,ddep_mvkn(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
+                                    call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                        ubzref,tmp2mref,gamma_set,31,ddep_isnp(loc,1))
                                 endif
                             else
                                 write(*,*)  'Wrong number of chemical species of ', chemmechgas_tot

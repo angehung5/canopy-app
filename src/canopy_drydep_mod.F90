@@ -164,4 +164,48 @@ contains
         return
     END SUBROUTINE CANOPY_GAS_DRYDEP_SNOW
 
+    SUBROUTINE CANOPY_GAS_DRYDEP_URBAN( CHEMMECHGAS_OPT,CHEMMECHGAS_TOT, UBAR, TEMP, GAMMA_BUILD, &
+        DEP_IND, DEP_OUT)
+
+        use canopy_const_mod,  ONLY: rk, pi, rgasuniv                       !constants for canopy models
+        use canopy_utils_mod,  ONLY: MolarMassGas, SoilRbg
+
+        INTEGER,     INTENT( IN )       :: CHEMMECHGAS_OPT    ! Select chemical mechanism
+        INTEGER,     INTENT( IN )       :: CHEMMECHGAS_TOT    ! Select chemical mechanism gas species list
+        REAL(RK),    INTENT( IN )       :: UBAR               ! Mean wind speed just above surface [m/s]
+        REAL(RK),    INTENT( IN )       :: TEMP               ! Mean temperature just above surface [K]
+        REAL(RK),    INTENT( IN )       :: GAMMA_BUILD        ! Reaction probability with building type (dimensionless)
+        ! Default NL is average of range in gamma from as low as 10−8 for
+        ! glass and metal to 10−4 for activated carbon and brick.
+        ! =5.0D-5.  Reference (Shen and Gao, 2018;
+        ! https://doi.org/10.1016/j.buildenv.2018.02.046)
+
+        INTEGER,     INTENT( IN )       :: DEP_IND            ! Gas deposition species index (depends on gas mech)
+        REAL(RK),    INTENT( OUT )      :: DEP_OUT            ! Output soil layer gas dry deposition rate for each DEP_IND
+
+        real(rk)                        :: mmg_l              ! molar mass for each gas species (kg/mol)
+        real(rk)                        :: cave_l             ! Maxwell-Boltzmann average speed of gas distribution (m/s)
+        real(rk)                        :: rurbanl            ! resistance to diffusion thru snow space for chemical species (s/m)
+        real(rk)                        :: rbg                ! ground boundary layer resistance (s/cm)
+
+        !Get molar mass for each gas species (kg/mol)
+        mmg_l = MolarMassGas(CHEMMECHGAS_OPT,CHEMMECHGAS_TOT,DEP_IND)
+
+        !Based on Maxwell-Boltzmann distribution, average speed of gas distribution (cm/s)
+        cave_l = sqrt((8.0_rk*rgasuniv*TEMP)/(pi*mmg_l))*100.0_rk
+
+        !Based on Shen and Gao (2018), Eq. (2):  https://doi.org/10.1016/j.buildenv.2018.02.046)
+        rurbanl = 4.0_rk/(GAMMA_BUILD*cave_l) !already converted in to units of s/cm from cave_l
+
+        rbg = SoilRbg(UBAR*100.0_rk) !convert wind to cm/s   !Rbg(ground boundary layer resistance, s/cm)
+        !Rbg is invariant to species not layers
+        !Must use second model layer as physically correct no-slip boundary condition is applied for wind speed at z = 0
+
+        !deposition velocity to urban surfaces (cm/s)
+        DEP_OUT = 1.0/(rbg+rurbanl)
+
+        return
+    END SUBROUTINE CANOPY_GAS_DRYDEP_URBAN
+
+
 end module canopy_drydep_mod
