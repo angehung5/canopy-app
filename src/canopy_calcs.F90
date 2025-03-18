@@ -37,6 +37,8 @@ SUBROUTINE canopy_calcs(nn)
     REAL(rk) :: tsteplai            !Number of days between the past and current LAI
     !Historical Averaging variables for biogenics
     REAL(rk) :: dnewfrac,doldfrac,hnewfrac,holdfrac
+    !For aerodynamic resistance and gas dry dep
+    REAL(rk) :: RiB,Ra
     !Other
     REAL(rk) :: lat2d(nlon,nlat), lon2d(nlon,nlat), lat1d(nlon*nlat), lon1d(nlon*nlat)
 
@@ -880,6 +882,11 @@ SUBROUTINE canopy_calcs(nn)
                                 if (ifcanwind) then   !ubar needed for rbl
                                     if (chemmechgas_opt .eq. 0)  then   !RACM2
                                         if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
+                                            !Calculate Bulk Richardson Number for stability dependent aerodynamic resistance
+                                            RiB=CalcRiB(tmp2mref, tmpsfcref, ubzref*100.0_rk, &
+                                                d_h_2d(i,j)*hcmref*100.0_rk, (hcmref+hgtref)*100.0_rk)
+                                            Ra=rav(ubzref*100.0_rk, (hcmref+hgtref)*100.0_rk, d_h_2d(i,j)*hcmref*100.0_rk, &
+                                                hcmref*100.0_rk, RiB)
                                             if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
                                                 call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                     zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
@@ -1434,6 +1441,13 @@ SUBROUTINE canopy_calcs(nn)
                             if (chemmechgas_opt .eq. 0)  then   !RACM2
                                 if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
                                     !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (hcmref .le. 0.0) then
+                                        hcmref = 0.01!m   (set to just above ground @ 1 cm; leads to z0 ~ 0.001 m
+                                    endif                ! needed for Ra calculation)
+                                    RiB=CalcRiB(tmp2mref, tmpsfcref, ubzref*100.0_rk, &
+                                        0.75_rk*hcmref*100.0_rk, (hcmref+hgtref)*100.0_rk) !assume d~3/4*Hc
+                                    Ra=rav(ubzref*100.0_rk, (hcmref+hgtref)*100.0_rk, 0.75_rk*hcmref*100.0_rk, &
+                                        hcmref*100.0_rk, RiB)
                                     if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
                                         if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
                                             call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
@@ -1792,6 +1806,13 @@ SUBROUTINE canopy_calcs(nn)
                             if (chemmechgas_opt .eq. 0)  then   !RACM2
                                 if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
                                     !urban gas dry depostion at level 1, i.e., z=0
+                                    if (hcmref .le. 0.0) then
+                                        hcmref = 0.01!m   (set to just above ground @ 1 cm; leads to z0 ~ 0.001 m
+                                    endif                ! needed for Ra calculation)
+                                    RiB=CalcRiB(tmp2mref, tmpsfcref, ubzref*100.0_rk, &
+                                        0.75_rk*hcmref*100.0_rk, (hcmref+hgtref)*100.0_rk) !assume d~3/4*Hc
+                                    Ra=rav(ubzref*100.0_rk, (hcmref+hgtref)*100.0_rk, 0.75_rk*hcmref*100.0_rk, &
+                                        hcmref*100.0_rk, RiB)
                                     if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
                                         call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
                                             ubzref,tmp2mref,gamma_set,1,ddep_no_3d(i,j,1))
@@ -1933,7 +1954,14 @@ SUBROUTINE canopy_calcs(nn)
                         if (ifcanddepgas ) then
                             if (chemmechgas_opt .eq. 0)  then   !RACM2
                                 if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
-                                    !urban gas dry depostion at level 1, i.e., z=0
+                                    !water gas dry depostion at level 1, i.e., z=0
+                                    if (hcmref .le. 0.0) then
+                                        hcmref = 0.01!m   (set to just above ground @ 1 cm; leads to z0 ~ 0.001 m
+                                    endif                ! needed for Ra calculation)
+                                    RiB=CalcRiB(tmp2mref, tmpsfcref, ubzref*100.0_rk, &
+                                        0.75_rk*hcmref*100.0_rk, (hcmref+hgtref)*100.0_rk) !assume d~3/4*Hc
+                                    Ra=rav(ubzref*100.0_rk, (hcmref+hgtref)*100.0_rk, 0.75_rk*hcmref*100.0_rk, &
+                                        hcmref*100.0_rk, RiB)
                                     if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
                                         call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
                                             tmp2mref,spfh2mref,ustref,1,ddep_no_3d(i,j,1))
@@ -2946,6 +2974,11 @@ SUBROUTINE canopy_calcs(nn)
                             if (ifcanwind) then   !ubar needed for rbl
                                 if (chemmechgas_opt .eq. 0) then   !RACM2
                                     if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
+                                        !Calculate Bulk Richardson Number for stability dependent aerodynamic resistance
+                                        RiB=CalcRiB(tmp2mref, tmpsfcref, ubzref*100.0_rk, &
+                                            d_h(loc)*hcmref*100.0_rk, (hcmref+hgtref)*100.0_rk)
+                                        Ra=rav(ubzref*100.0_rk, (hcmref+hgtref)*100.0_rk, d_h(loc)*hcmref*100.0_rk, &
+                                            hcmref*100.0_rk, RiB)
                                         if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
                                             call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
                                                 zk, hcmref, tka(loc,:), pressa(loc,:), &
@@ -3499,6 +3532,13 @@ SUBROUTINE canopy_calcs(nn)
                         if (chemmechgas_opt .eq. 0)  then   !RACM2
                             if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
                                 !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (hcmref .le. 0.0) then
+                                    hcmref = 0.01!m   (set to just above ground @ 1 cm; leads to z0 ~ 0.001 m
+                                endif                ! needed for Ra calculation)
+                                RiB=CalcRiB(tmp2mref, tmpsfcref, ubzref*100.0_rk, &
+                                    0.75_rk*hcmref*100.0_rk, (hcmref+hgtref)*100.0_rk) !assume d~3/4*Hc
+                                Ra=rav(ubzref*100.0_rk, (hcmref+hgtref)*100.0_rk, 0.75_rk*hcmref*100.0_rk, &
+                                    hcmref*100.0_rk, RiB)
                                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
                                     if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
                                         call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
@@ -3857,6 +3897,13 @@ SUBROUTINE canopy_calcs(nn)
                         if (chemmechgas_opt .eq. 0)  then   !RACM2
                             if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
                                 !urban gas dry depostion at level 1, i.e., z=0
+                                if (hcmref .le. 0.0) then
+                                    hcmref = 0.01!m   (set to just above ground @ 1 cm; leads to z0 ~ 0.001 m
+                                endif                ! needed for Ra calculation)
+                                RiB=CalcRiB(tmp2mref, tmpsfcref, ubzref*100.0_rk, &
+                                    0.75_rk*hcmref*100.0_rk, (hcmref+hgtref)*100.0_rk) !assume d~3/4*Hc
+                                Ra=rav(ubzref*100.0_rk, (hcmref+hgtref)*100.0_rk, 0.75_rk*hcmref*100.0_rk, &
+                                    hcmref*100.0_rk, RiB)
                                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
                                     call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
                                         ubzref,tmp2mref,gamma_set,1,ddep_no(loc,1))
@@ -3998,7 +4045,14 @@ SUBROUTINE canopy_calcs(nn)
                     if (ifcanddepgas ) then
                         if (chemmechgas_opt .eq. 0)  then   !RACM2
                             if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
-                                !urban gas dry depostion at level 1, i.e., z=0
+                                !water gas dry depostion at level 1, i.e., z=0
+                                if (hcmref .le. 0.0) then
+                                    hcmref = 0.01!m   (set to just above ground @ 1 cm; leads to z0 ~ 0.001 m
+                                endif                ! needed for Ra calculation)
+                                RiB=CalcRiB(tmp2mref, tmpsfcref, ubzref*100.0_rk, &
+                                    0.75_rk*hcmref*100.0_rk, (hcmref+hgtref)*100.0_rk) !assume d~3/4*Hc
+                                Ra=rav(ubzref*100.0_rk, (hcmref+hgtref)*100.0_rk, 0.75_rk*hcmref*100.0_rk, &
+                                    hcmref*100.0_rk, RiB)
                                 if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
                                     call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
                                         tmp2mref,spfh2mref,ustref,1,ddep_no(loc,1))

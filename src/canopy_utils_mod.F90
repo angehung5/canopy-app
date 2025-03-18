@@ -15,7 +15,7 @@ module canopy_utils_mod
         SetEffHenrysLawCoeffs,SetReactivityParams,ReactivityParam, &
         EffHenrysLawCoeff,SoilResist,SoilRbg,WaterRbw,ReactivityParamHNO3, &
         SetReactivityHNO3,MolarMassGas,SetMolarMassGas, &
-        LeBasMVGas,SetLeBasMVGas
+        LeBasMVGas,SetLeBasMVGas,rav,CalcRib
 
 contains
 
@@ -1816,5 +1816,85 @@ contains
         return
     end subroutine SetLeBasMVGas
 
+!**********************************************************************************************************************!
+! subroutine rav - calculate aerodynamic resistance (ra)
+!
+! Uses formulation of ...
+!  Viney (1991) BLM, 56, 381-393.
+!
+!**********************************************************************************************************************!
+    function rav(ubar, zref, d, hc, rib)
+        real(rk)              :: rav     ! aerodynamic resistance, ra (s/cm)
+        real(rk), intent(in)  :: ubar    ! wind speed at reference height (cm/s)
+        real(rk), intent(in)  :: zref    ! reference height (m or cm)
+        real(rk), intent(in)  :: d       ! displacement height (m or cm)
+
+        real(rk), intent(in)  :: hc      ! height of canopy (m or cm)
+        ! zref, d, and hc must all be same units!
+        real(rk), intent(in)  :: rib     ! bulk Richardson number
+        real(rk), parameter   :: kv=0.4  ! von Karman constant
+        real(rk)              :: gmm     ! momentum gamma
+        real(rk)              :: gmh     ! heat gamma
+        real(rk)              :: z0m     ! momentum roughness height (m or cm)
+        real(rk)              :: z0h     ! heat roughness height (m or cm)
+        real(rk)              :: rapr    ! ra neutral (s/cm)
+        real(rk)              :: phim    ! momentum stability function
+        real(rk)              :: phih    ! heat stability function
+        real(rk)              :: a, b, c ! Viney empirical constants for unstable
+
+        z0m = 0.13_rk*hc
+        z0h = z0m/7.0_rk
+
+        if((zref-d) <= 0.) then
+            write(*,*) "critical problem: zref <= d"
+            write(*,*) "possibility: hcan <= zpd, this can't be..."
+            call exit(1)
+        end if
+
+        gmm = log((zref-d)/z0m)
+        gmh = log((zref-d)/z0h)
+
+        rapr = (gmm*gmh)/(kv*kv*ubar)
+
+        if (rib > 0.0) then
+            ! stable
+            phim = (gmh+10.0_rk*rib*gmm-((gmh*gmh+20.0_rk*rib*gmm*(gmh-gmm))**0.5_rk))/(2.0_rk-10.0_rk*rib)
+            phim = max(-5.0_rk, phim)
+            phih = phim
+            rav = ((gmh-phih)*(gmm-phim))/(kv*kv*ubar)
+        else if (rib < 0.0) then
+            ! unstable
+            a = 1.0591_rk - 0.0552_rk*log(1.72_rk+(4.03_rk-gmm)**2.0_rk)
+            b = 1.9117_rk - 0.2237_rk*log(1.86_rk+(2.12_rk-gmm)**2.0_rk)
+            c = 0.8437_rk - 0.1243_rk*log(3.49_rk+(2.79_rk-gmm)**2.0_rk)
+            rav = rapr/(a + b*(-1.0_rk*rib)**c)
+        else
+            ! neutral
+            rav = rapr
+        end if
+
+        if (rav .lt. 0.0) then
+            rav = rav*(-1.0_rk) !rav can switch sign to negative in some stable conditions
+        endif
+
+        return
+    end function rav
+
+!**********************************************************************************************************************!
+! CalcRiB ... compute the bulk Richardson number
+!
+!**********************************************************************************************************************!
+    function CalcRiB(tak, tsk, ubari, d, zref)
+        real(rk), intent(in) :: tak            ! air temperature at zref (K)
+        real(rk), intent(in) :: tsk            ! surface temperature (K)
+        real(rk), intent(in) :: ubari          ! mean wind speed at zref (cm/s)
+        real(rk), intent(in) :: zref           ! reference height (cm)
+        real(rk), intent(in) :: d              ! displacement height (cm)
+        real(rk), parameter  :: g=982.2        ! gravitational acceleration (cm/s2)
+        real(rk)             :: CalcRiB        ! bulk Richardson number ()
+
+        CalcRiB = ((zref-d)*g*(tak-tsk))/(ubari*ubari*tak)
+        return
+    end function CalcRiB
 
 end module canopy_utils_mod
