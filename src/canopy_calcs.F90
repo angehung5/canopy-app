@@ -1928,8 +1928,150 @@ SUBROUTINE canopy_calcs(nn)
                                 call exit(2)
                             end if
                         end if
+                    else if (vtyperef .eq. 0) then !Water from FV3 (usually vtype = 17 for water)
+! ... user option to calculate dry deposition velocity...for land use outside of vegetated canopies
+                        if (ifcanddepgas ) then
+                            if (chemmechgas_opt .eq. 0)  then   !RACM2
+                                if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
+                                    !urban gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,1,ddep_no_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,2,ddep_no2_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,3,ddep_o3_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,4,ddep_hono_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,5,ddep_hno4_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,6,ddep_hno3_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,7,ddep_n2o5_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,8,ddep_co_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,9,ddep_h2o2_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,10,ddep_ch4_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,11,ddep_mo2_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,12,ddep_op1_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,13,ddep_moh_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,14,ddep_no3_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 15) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,15,ddep_o3p_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,16,ddep_o1d_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,17,ddep_ho_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,18,ddep_ho2_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,19,ddep_ora1_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,20,ddep_hac_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,21,ddep_paa_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,22,ddep_dhmob_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,23,ddep_hpald_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,24,ddep_ishp_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,25,ddep_iepox_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,26,ddep_propnn_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,27,ddep_isopnb_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,28,ddep_isopnd_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,29,ddep_macrn_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,30,ddep_mvkn_3d(i,j,1))
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref,31,ddep_isnp_3d(i,j,1))
+                                    endif
+                                else
+                                    write(*,*)  'Wrong number of chemical species of ', chemmechgas_tot
+                                    write(*,*)  ' in namelist...exiting'
+                                    write(*,*)  'Set chemmechgas_tot = 31 for RACM2'
+                                    call exit(2)
+                                end if
+                            else
+                                write(*,*)  'Wrong chemical mechanism option of ', chemmechgas_opt, ' in namelist...exiting'
+                                write(*,*)  'Set chemmechgas_opt = 0 (RACM2) for now'
+                                call exit(2)
+                            end if
+                        end if
                     else
-!                        write(*,*)  'Warning VIIRS/MODIS VTYPE ', vtyperef, ' is not supported...continue'
+                        write(*,*)  'Warning VIIRS/MODIS VTYPE ', vtyperef, ' is not supported...continue'
                     end if   !Vegetation types
                 else
                     write(*,*)  'Wrong LU_OPT choice of ', lu_opt, ' in namelist...exiting'
@@ -3851,8 +3993,150 @@ SUBROUTINE canopy_calcs(nn)
                             call exit(2)
                         end if
                     end if
+                else if (vtyperef .eq. 0) then !Water from FV3 (usually vtype = 17 for water)
+! ... user option to calculate dry deposition velocity...for land use outside of vegetated canopies
+                    if (ifcanddepgas ) then
+                        if (chemmechgas_opt .eq. 0)  then   !RACM2
+                            if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
+                                !urban gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,1,ddep_no(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,2,ddep_no2(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,3,ddep_o3(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,4,ddep_hono(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,5,ddep_hno4(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,6,ddep_hno3(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,7,ddep_n2o5(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,8,ddep_co(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,9,ddep_h2o2(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,10,ddep_ch4(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,11,ddep_mo2(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,12,ddep_op1(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,13,ddep_moh(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,14,ddep_no3(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 15) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,15,ddep_o3p(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,16,ddep_o1d(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,17,ddep_ho(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,18,ddep_ho2(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,19,ddep_ora1(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,20,ddep_hac(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,21,ddep_paa(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,22,ddep_dhmob(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,23,ddep_hpald(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,24,ddep_ishp(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,25,ddep_iepox(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,26,ddep_propnn(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,27,ddep_isopnb(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,28,ddep_isopnd(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,29,ddep_macrn(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,30,ddep_mvkn(loc,1))
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
+                                    call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                        tmp2mref,spfh2mref,ustref,31,ddep_isnp(loc,1))
+                                endif
+                            else
+                                write(*,*)  'Wrong number of chemical species of ', chemmechgas_tot
+                                write(*,*)  ' in namelist...exiting'
+                                write(*,*)  'Set chemmechgas_tot = 31 for RACM2'
+                                call exit(2)
+                            end if
+                        else
+                            write(*,*)  'Wrong chemical mechanism option of ', chemmechgas_opt, ' in namelist...exiting'
+                            write(*,*)  'Set chemmechgas_opt = 0 (RACM2) for now'
+                            call exit(2)
+                        end if
+                    end if
                 else
-!                    write(*,*)  'Warning VIIRS/MODIS VTYPE ', vtyperef, ' is not supported...continue'
+                    write(*,*)  'Warning VIIRS/MODIS VTYPE ', vtyperef, ' is not supported...continue'
                 end if   !Vegetation types
             else
                 write(*,*)  'Wrong LU_OPT choice of ', lu_opt, ' in namelist...exiting'

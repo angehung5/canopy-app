@@ -124,7 +124,7 @@ contains
 
         rbg = SoilRbg(UBAR*100.0_rk) !convert wind to cm/s   !Rbg(ground boundary layer resistance, s/cm)
         !Rbg is invariant to species not layers
-        !Must use second model layer as physically correct no-slip boundary condition is applied for wind speed at z = 0
+        !Must use model layer above surface as physically correct no-slip boundary condition is applied for wind speed at z = 0
 
         DEP_OUT = 1.0/(rbg+rsoill)                               !deposition velocity to ground surface under canopy or outside of
         !canopy, e.g., barren land (cm/s)
@@ -156,7 +156,7 @@ contains
 
         rbg = SoilRbg(UBAR*100.0_rk) !convert wind to cm/s   !Rbg(ground boundary layer resistance, s/cm)
         !Rbg is invariant to species not layers
-        !Must use second model layer as physically correct no-slip boundary condition is applied for wind speed at z = 0
+        !Must use model layer above surface as physically correct no-slip boundary condition is applied for wind speed at z = 0
 
         DEP_OUT = 1.0/(rbg+rsnowl)                               !deposition velocity to ground surface under canopy or outside of
         !canopy, e.g., barren land (cm/s) when snow cover is present
@@ -199,7 +199,7 @@ contains
 
         rbg = SoilRbg(UBAR*100.0_rk) !convert wind to cm/s   !Rbg(ground boundary layer resistance, s/cm)
         !Rbg is invariant to species not layers
-        !Must use second model layer as physically correct no-slip boundary condition is applied for wind speed at z = 0
+        !Must use model layer above surface as physically correct no-slip boundary condition is applied for wind speed at z = 0
 
         !deposition velocity to urban surfaces (cm/s)
         DEP_OUT = 1.0/(rbg+rurbanl)
@@ -207,5 +207,74 @@ contains
         return
     END SUBROUTINE CANOPY_GAS_DRYDEP_URBAN
 
+    SUBROUTINE CANOPY_GAS_DRYDEP_WATER( CHEMMECHGAS_OPT,CHEMMECHGAS_TOT, TEMP2, QV2, &
+        USTAR, DEP_IND, DEP_OUT)
+
+        use canopy_const_mod,  ONLY: rk, cpd, lv0, dlvdt, stdtemp      !constants for canopy models
+        use canopy_utils_mod,  ONLY: EffHenrysLawCoeff, LeBasMVGas, WaterRbw
+
+        INTEGER,     INTENT( IN )       :: CHEMMECHGAS_OPT     ! Select chemical mechanism
+        INTEGER,     INTENT( IN )       :: CHEMMECHGAS_TOT     ! Select chemical mechanism gas species list
+        REAL(RK),    INTENT( IN )       :: TEMP2               ! Mean temperature just above surface [K]
+        REAL(RK),    INTENT( IN )       :: QV2                 ! Mean mixing ratio just above surface [kg/kg]
+        REAL(RK),    INTENT( IN )       :: USTAR               ! Friction velocity at surface (m/s)
+
+        INTEGER,     INTENT( IN )       :: DEP_IND            ! Gas deposition species index (depends on gas mech)
+        REAL(RK),    INTENT( OUT )      :: DEP_OUT            ! Output soil layer gas dry deposition rate for each DEP_IND
+
+        real(rk)                        :: hstarl             ! effective Henry's law coefficient based on DEP_IND (M/atm)
+        real(rk)                        :: ctemp2             ! Mean temperature just above surface [C]
+        real(rk)                        :: lv                 ! latent heat of vaporization [ J/kg ]
+        real(rk)                        :: cp_air             ! specific heat of moist air [J/kg-K]
+        real(rk)                        :: tw                 ! wet bulb temperature [K]
+
+        real(rk)                        :: lebas_l            ! Le Bas molar volumes are from the Schroeder additive method [cm3/mol ]
+        real(rk)                        :: dw                 ! diffusivity of water
+        real(rk)                        :: dw25               ! diffusivity of water at 298.15 K
+        real(rk)                        :: kvisw              ! kinematic viscosity of water [cm^2/s]
+        real(rk)                        :: scw_pr_23          ! (scw/pr)**2/3
+        real(rk)                        :: rbw                ! water boundary layer resistance (s/cm)
+        real(rk)                        :: rwaterl            ! water surface resistance (s/cm)
+
+        real(rk), Parameter             :: pr         = 0.709 ! Prandtl Number [dim'less]
+        real(rk), Parameter             :: rt25inK    = 1.0_rk/(stdtemp + 25.0_rk) ! 298.15K = 25C
+        real(rk), Parameter             :: twothirds  = 2.0_rk / 3.0_rk
+        real(rk), Parameter             :: d3         = 1.38564e-2 ! scaling parameter used to estimate the friction velocity in surface waters from
+        ! the atmospheric friction velocity to a value following Slinn et al. (1978)
+        ! and Fairall et al. (2007)
+
+        hstarl  = EffHenrysLawCoeff(CHEMMECHGAS_OPT,CHEMMECHGAS_TOT,DEP_IND)
+
+        ! Calculate the water surface film temperature: wet bulb temperature.
+        ! Wet bulb temperature based on eqn in Fritschen and Gay (1979).
+
+        ctemp2 = TEMP2 - stdtemp                                      ! [C]
+        lv     = lv0 - dlvdt * ctemp2                                 ! [J/kg]
+        cp_air = cpd * ( 1.0_rk + 0.84_rk * QV2 )                     ! [J/kg-K]
+        tw     = ( ( 4.71e4 * cp_air / lv ) - 0.870_rk ) + stdtemp    ! [K]
+
+        ! Make Henry's Law constant non-dimensional.
+
+        hstarl  = hstarl * 0.08205_rk * tw
+
+        !Get Le Bas molar volumes for each gas species [[cm3/mol ]
+        lebas_l = LeBasMVGas(CHEMMECHGAS_OPT,CHEMMECHGAS_TOT,DEP_IND)
+
+        ! from Hayduk and Laudie
+        dw25 = 13.26e-5 / ( 0.8904_rk**1.14_rk * lebas_l**0.589_rk )
+        kvisw = 0.017_rk * EXP( -0.025_rk * ( tw - stdtemp ) )
+        dw    = dw25 * ( tw * rt25inK ) * ( 0.009025_rk / kvisw )
+        scw_pr_23 = ( ( kvisw / dw ) / pr ) ** twothirds
+
+        rwaterl = scw_pr_23 / ( hstarl * d3 * USTAR*100.0_rk ) ! Resistance to water surface, (s/cm)
+
+        rbw = WaterRbw(d3*USTAR*100.0_rk) !convert ustar to cm/s and scale by d3  !Rbw(water boundary layer resistance, s/cm)
+        !Rbw is invariant to species not layers
+
+        !deposition velocity to water surfaces (cm/s)
+        DEP_OUT = 1.0/(rbw+rwaterl)
+
+        return
+    END SUBROUTINE CANOPY_GAS_DRYDEP_WATER
 
 end module canopy_drydep_mod

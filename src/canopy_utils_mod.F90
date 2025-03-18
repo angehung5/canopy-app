@@ -13,8 +13,9 @@ module canopy_utils_mod
         CalcRelHum,CalcSpecHum,CalcCair,Convert_qh_to_h2o, &
         SetMolecDiffSTP,MolecDiff,rs_zhang_gas,rbl,rcl,rml, &
         SetEffHenrysLawCoeffs,SetReactivityParams,ReactivityParam, &
-        EffHenrysLawCoeff,SoilResist,SoilRbg,ReactivityParamHNO3, &
-        SetReactivityHNO3,MolarMassGas,SetMolarMassGas
+        EffHenrysLawCoeff,SoilResist,SoilRbg,WaterRbw,ReactivityParamHNO3, &
+        SetReactivityHNO3,MolarMassGas,SetMolarMassGas, &
+        LeBasMVGas,SetLeBasMVGas
 
 contains
 
@@ -1547,6 +1548,23 @@ contains
         return
     end function SoilRbg
 
+!=====================================================================================
+!function WaterRbw - calculate the boundary layer resistance at the ground surface. Rbg
+!
+!Source - Based on Schuepp (1977), but modified for water an input scaled ustar
+!=====================================================================================
+    function WaterRbw(ustar)
+        real(rk), intent(in)  :: ustar            !scaled model friction velocity at water (cm/s)
+        real(rk)              :: WaterRbw         !Boundary layer resistance at water surface (s/cm)
+        real(rk), parameter   :: rbwmax = 1.67    !maximum water surface boundary layer resistance (s/cm)
+        real(rk)              :: rbw              !temporary variable for boundary layer resistance (s/cm)
+
+        rbw = 11.534_rk/(ustar)                   !assume Sc=0.7,del0/zl = 0.02 (Weber,1999)
+        WaterRbw = min(rbwmax,rbw)
+
+        return
+    end function WaterRbw
+
 !========================================================================
 !function EffHenrysLawCoeff - calculate Henry's Law coefficient (M/atm)
 !                             have not include temperature dependence yet
@@ -1573,7 +1591,7 @@ contains
         real(rk),dimension(chemmechgas_tot),intent(out) :: hstar
 
         if (chemmechgas_opt .eq. 0) then !RACM2
-            !Insert MolecDiffSTP Coefficients for RACM2_plus mechanism
+            !Insert Henry's Law Coefficients for RACM2_plus mechanism
             !species in array are:
             != (/NO,   NO2,    O3,  HONO,  HNO4,   HNO3,   N2O5,     CO,  H2O2,  CH4,
             !MO2,   OP1,   MOH,   NO3,   O3P,    O1D,     HO,    HO2,  ORA1,  HAC,
@@ -1624,7 +1642,7 @@ contains
         real(rk),dimension(chemmechgas_tot),intent(out) :: f0
 
         if (chemmechgas_opt .eq. 0) then !RACM2
-            !Insert MolecDiffSTP Coefficients for RACM2_plus mechanism
+            !Insert Reactivity Params Coefficients for RACM2_plus mechanism
             !species in array are:
             != (/NO,   NO2,    O3,  HONO,  HNO4,   HNO3,   N2O5,     CO,  H2O2,  CH4,
             !MO2,   OP1,   MOH,   NO3,   O3P,    O1D,     HO,    HO2,  ORA1,  HAC,
@@ -1674,7 +1692,7 @@ contains
         real(rk),dimension(chemmechgas_tot),intent(out) :: ar
 
         if (chemmechgas_opt .eq. 0) then !RACM2
-            !Insert MolecDiffSTP Coefficients for RACM2_plus mechanism
+            !Insert Reactivity Coefficients for RACM2_plus mechanism
             !species in array are:
             != (/NO,   NO2,    O3,  HONO,  HNO4,   HNO3,   N2O5,     CO,  H2O2,  CH4,
             !MO2,   OP1,   MOH,   NO3,   O3P,    O1D,     HO,    HO2,  ORA1,  HAC,
@@ -1699,7 +1717,7 @@ contains
     end subroutine SetReactivityHNO3
 
 !==========================================================================
-!function Molar Mass - set molar mass for gas species  (dimensionless)
+!function Molar Mass - set molar mass for gas species  (kg/mol)
 !==========================================================================
     function MolarMassGas(chemmechgas_opt,chemmechgas_tot,ispec)
         integer, intent(in)        :: chemmechgas_opt,chemmechgas_tot ! chemical mechanism and total gas species including transported
@@ -1724,7 +1742,7 @@ contains
         real(rk),dimension(chemmechgas_tot),intent(out) :: mmg  !Molar Mass of Gases (kg/mol)
 
         if (chemmechgas_opt .eq. 0) then !RACM2
-            !Insert MolecDiffSTP Coefficients for RACM2_plus mechanism
+            !Insert Molar Mass for RACM2_plus mechanism
             !species in array are:
             != (/NO,   NO2,    O3,  HONO,  HNO4,   HNO3,   N2O5,     CO,  H2O2,  CH4,
             !MO2,   OP1,   MOH,   NO3,   O3P,    O1D,     HO,    HO2,  ORA1,  HAC,
@@ -1747,6 +1765,56 @@ contains
         end if
         return
     end subroutine SetMolarMassGas
+
+!==========================================================================
+!function Le Bas Molar Volume - set molar volume for gas species  (cm3/mol)
+!==========================================================================
+    function LeBasMVGas(chemmechgas_opt,chemmechgas_tot,ispec)
+        integer, intent(in)        :: chemmechgas_opt,chemmechgas_tot ! chemical mechanism and total gas species including transported
+        integer, intent(in)        :: ispec      !dummy id for species
+        real(rk)                   :: LeBasMVGas !Le Bas Molar Volume of Gases (cm3/mol)
+        real(rk),dimension(chemmechgas_tot) :: mvg
+
+        call SetLeBasMVGas(chemmechgas_opt,chemmechgas_tot,mvg)
+        LeBasMVGas = mvg(ispec)
+
+        return
+    end function LeBasMVGas
+
+!========================================================
+!function mvg - set Molar Volume for all gas species
+!
+!source - Molar Volume for Gas Species - Le Bas
+!========================================================
+    subroutine SetLeBasMVGas(chemmechgas_opt,chemmechgas_tot,mvg)
+!    integer(kind=i4)                              :: l               !l is species
+        integer, intent(in)                             :: chemmechgas_opt,chemmechgas_tot ! chemical mechanism and total gas species including transported
+        real(rk),dimension(chemmechgas_tot),intent(out) :: mvg  !Molar Volume of Gases (cm3/mol)
+
+        if (chemmechgas_opt .eq. 0) then !RACM2
+            !Insert MV Gas Coefficients for RACM2_plus mechanism
+            !species in array are:
+            != (/NO,   NO2,    O3,  HONO,  HNO4,   HNO3,   N2O5,     CO,  H2O2,  CH4,
+            !MO2,   OP1,   MOH,   NO3,   O3P,    O1D,     HO,    HO2,  ORA1,  HAC,
+            !PAA, DHMOB, HPALD,  ISHP, IEPOX, PROPNN, ISOPNB, ISOPND, MACRN, MVKN,
+            !ISNP /)
+            if (chemmechgas_tot .gt. 31) then ! too many species defined
+                write(*,*)  'Too many species of ', chemmechgas_tot, ' in namelist for this chemmechgas_opt....exiting'
+                write(*,*)  'Set chemmechgas_tot < 31'
+                call exit(2)
+            else
+                mvg = (/14.0, 21.0, 21.0, 28.0, 45.2, 35.0, 49.0, 14.0, 28.0, 29.6,  &
+                    49.0, 49.0, 42.5, 28.0, 21.0, 21.0, 49.0, 49.0, 63.0, 63.0,  &
+                    70.0, 49.0, 49.0, 49.0, 110.8, 133.0, 147.8, 147.8, 88.8, 28.0,  &
+                    28.0 /)
+            end if
+        else
+            write(*,*)  'Wrong chemical mechanism option of ', chemmechgas_opt, ' in namelist...exiting'
+            write(*,*)  'Set chemmechgas_opt to only 0 (RACM2) for now'
+            call exit(2)
+        end if
+        return
+    end subroutine SetLeBasMVGas
 
 
 end module canopy_utils_mod
