@@ -372,7 +372,7 @@ Otherwise, please contact Patrick.C.Campbell@noaa.gov for other GFSv16 data peri
 | `snowc_set`      | Set default value for threshold percent snow cover, above which grid/point at ground is treated as dominant covered by snow  (Default = 50%).  Note: This applies at grids/points both beneath the vegetative canopies at ground as well as grids/points outside of contiguous canopies, e.g., barren lands, snow/ice, urban, and water) |
 | `icec_set`      | Set default value for threshold percent ice cover, above which grid/point at ground or water is treated as dominant covered by ice  (Default = 50%).  Note: This applies at grids/points both beneath the vegetative canopies at ground as well as grids/points outside of contiguous canopies, e.g., barren lands, snow/ice, urban, and water) |
 | `gamma_set`      | Set default reaction probability for gas dry deposition for respective building surface (default = 5.0D-5; Based on average of range in gamma across different building surfaces, e.g., 10-8 for glass and metal to 10-4 for activated carbon and brick; Gao and Shen (2018); https://doi.org/10.1016/j.buildenv.2018.02.046). Note: This only applies across dominant urban grids/points. |
-
+| `Ramin_set`      | Set default minimum aerodynamic resistance for gas dry deposition (Default 10 s/m) |
 
 
 **\*\*** If `modres` >> `flameh` then some error in WAF calculation will be incurred.  Suggestion is to use relative fine `modres` (at least <= 0.5 m) compared to average flame heights (e.g., ~ 1.0 m) if WAF is required.

@@ -32,7 +32,7 @@ SUBROUTINE canopy_readnml
         leafage_opt, lai_tstep, soim_opt, soild1, soild2, soild3, soild4, aq_opt, w126_set, &
         ht_opt, lt_opt, hw_opt, hist_opt, loss_opt, loss_set, loss_ind, lifetime, &
         ddepspecgas_opt, chemmechgas_opt, chemmechgas_tot, soilcat_opt, hyblev1, snowc_set, &
-        icec_set, gamma_set
+        icec_set, gamma_set, Ramin_set
 
 
 !-------------------------------------------------------------------------------
@@ -454,6 +454,11 @@ SUBROUTINE canopy_readnml
 !-------------------------------------------------------------------------------
 ! !Set default reaction probability for gas dry deposition to different building surfaces (default = 5.0D-5)
     gamma_set = 5.0D-5
+!-------------------------------------------------------------------------------
+
+!-------------------------------------------------------------------------------
+! !Set default minimum aerodynamic resistance (default = 10 s/m)
+    Ramin_set = 10.0_rk
 !-------------------------------------------------------------------------------
 
 !-------------------------------------------------------------------------------

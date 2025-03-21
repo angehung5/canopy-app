@@ -8,7 +8,7 @@ contains
     SUBROUTINE CANOPY_GAS_DRYDEP_ZHANG( CHEMMECHGAS_OPT,CHEMMECHGAS_TOT, &
         ZK, FCH, TEMPA, PRESSA, &
         RELHUMA, FSUN, PPFD_SUN, PPFD_SHADE, UBAR, &
-        SRAD, DEP_IND, DEP_OUT)
+        SRAD, RA, DEP_IND, DEP_OUT)
 
 !-----------------------------------------------------------------------
 
@@ -49,6 +49,7 @@ contains
         REAL(RK),    INTENT( IN )       :: RELHUMA(:)         ! Ambient Relative Humidity profile in canopy [%]
         REAL(RK),    INTENT( IN )       :: UBAR(:)            ! Mean above/in-canopy wind speed [m/s]
         REAL(RK),    INTENT( IN )       :: SRAD               ! Incoming solar irradiation top of canopy (W/m^2)
+        REAL(RK),    INTENT( IN )       :: RA                 ! Aerodynamic resistance (s/cm)
         INTEGER,     INTENT( IN )       :: DEP_IND            ! Gas deposition species index (depends on gas mech, set in constants)
         REAL(RK),    INTENT( OUT )      :: DEP_OUT(:)         ! Output canopy layer gas dry deposition rate for each DEP_IND
 
@@ -95,7 +96,7 @@ contains
 
 
     SUBROUTINE CANOPY_GAS_DRYDEP_SOIL( CHEMMECHGAS_OPT,CHEMMECHGAS_TOT, &
-        TEMPSOIL, PRESSA, UBAR, SOCAT, SOTYP, DSOIL, STHETA, DEP_IND, DEP_OUT)
+        TEMPSOIL, PRESSA, UBAR, SOCAT, SOTYP, DSOIL, STHETA, RA, DEP_IND, DEP_OUT)
 
         use canopy_const_mod,  ONLY: rk                       !constants for canopy models
         use canopy_utils_mod,  ONLY: MolecDiff,SoilResist,SoilRbg
@@ -109,7 +110,7 @@ contains
         INTEGER,     INTENT( IN )       :: SOTYP              ! input soil type integer associated with soilcat
         REAL(RK),    INTENT( IN )       :: DSOIL              ! depth of topsoil (cm)
         REAL(RK),    INTENT( IN )       :: STHETA             ! volumetric soil water content in topsoil(m^3/m^3)
-
+        REAL(RK),    INTENT( IN )       :: RA                 ! Aerodynamic resistance (s/cm)
         INTEGER,     INTENT( IN )       :: DEP_IND            ! Gas deposition species index (depends on gas mech)
         REAL(RK),    INTENT( OUT )      :: DEP_OUT            ! Output soil layer gas dry deposition rate for each DEP_IND
 
@@ -125,14 +126,13 @@ contains
         rbg = SoilRbg(UBAR*100.0_rk) !convert wind to cm/s   !Rbg(ground boundary layer resistance, s/cm)
         !Rbg is invariant to species not layers
         !Must use model layer above surface as physically correct no-slip boundary condition is applied for wind speed at z = 0
-
-        DEP_OUT = 1.0/(rbg+rsoill)                               !deposition velocity to ground surface under canopy or outside of
+        DEP_OUT = 1.0_rk/(rbg+rsoill+RA)                         !deposition velocity to ground surface under canopy or outside of
         !canopy, e.g., barren land (cm/s)
 
         return
     END SUBROUTINE CANOPY_GAS_DRYDEP_SOIL
 
-    SUBROUTINE CANOPY_GAS_DRYDEP_SNOW( CHEMMECHGAS_OPT,CHEMMECHGAS_TOT, UBAR, DEP_IND, DEP_OUT)
+    SUBROUTINE CANOPY_GAS_DRYDEP_SNOW( CHEMMECHGAS_OPT,CHEMMECHGAS_TOT, UBAR, RA, DEP_IND, DEP_OUT)
 
         use canopy_const_mod,  ONLY: rk                       !constants for canopy models
         use canopy_utils_mod,  ONLY: ReactivityParamHNO3, SoilRbg
@@ -140,7 +140,7 @@ contains
         INTEGER,     INTENT( IN )       :: CHEMMECHGAS_OPT    ! Select chemical mechanism
         INTEGER,     INTENT( IN )       :: CHEMMECHGAS_TOT    ! Select chemical mechanism gas species list
         REAL(RK),    INTENT( IN )       :: UBAR               ! Mean wind speed just above surface [m/s]
-
+        REAL(RK),    INTENT( IN )       :: RA                 ! Aerodynamic resistance (s/cm)
         INTEGER,     INTENT( IN )       :: DEP_IND            ! Gas deposition species index (depends on gas mech)
         REAL(RK),    INTENT( OUT )      :: DEP_OUT            ! Output soil layer gas dry deposition rate for each DEP_IND
 
@@ -158,14 +158,14 @@ contains
         !Rbg is invariant to species not layers
         !Must use model layer above surface as physically correct no-slip boundary condition is applied for wind speed at z = 0
 
-        DEP_OUT = 1.0/(rbg+rsnowl)                               !deposition velocity to ground surface under canopy or outside of
+        DEP_OUT = 1.0_rk/(rbg+rsnowl+RA)                               !deposition velocity to ground surface under canopy or outside of
         !canopy, e.g., barren land (cm/s) when snow cover is present
 
         return
     END SUBROUTINE CANOPY_GAS_DRYDEP_SNOW
 
     SUBROUTINE CANOPY_GAS_DRYDEP_URBAN( CHEMMECHGAS_OPT,CHEMMECHGAS_TOT, UBAR, TEMP, GAMMA_BUILD, &
-        DEP_IND, DEP_OUT)
+        RA, DEP_IND, DEP_OUT)
 
         use canopy_const_mod,  ONLY: rk, pi, rgasuniv                       !constants for canopy models
         use canopy_utils_mod,  ONLY: MolarMassGas, SoilRbg
@@ -179,7 +179,7 @@ contains
         ! glass and metal to 10−4 for activated carbon and brick.
         ! =5.0D-5.  Reference (Shen and Gao, 2018;
         ! https://doi.org/10.1016/j.buildenv.2018.02.046)
-
+        REAL(RK),    INTENT( IN )       :: RA                 ! Aerodynamic resistance (s/cm)
         INTEGER,     INTENT( IN )       :: DEP_IND            ! Gas deposition species index (depends on gas mech)
         REAL(RK),    INTENT( OUT )      :: DEP_OUT            ! Output soil layer gas dry deposition rate for each DEP_IND
 
@@ -202,13 +202,13 @@ contains
         !Must use model layer above surface as physically correct no-slip boundary condition is applied for wind speed at z = 0
 
         !deposition velocity to urban surfaces (cm/s)
-        DEP_OUT = 1.0/(rbg+rurbanl)
+        DEP_OUT = 1.0_rk/(rbg+rurbanl+RA)
 
         return
     END SUBROUTINE CANOPY_GAS_DRYDEP_URBAN
 
     SUBROUTINE CANOPY_GAS_DRYDEP_WATER( CHEMMECHGAS_OPT,CHEMMECHGAS_TOT, TEMP2, QV2, &
-        USTAR, DEP_IND, DEP_OUT)
+        USTAR, RA, DEP_IND, DEP_OUT)
 
         use canopy_const_mod,  ONLY: rk, cpd, lv0, dlvdt, stdtemp      !constants for canopy models
         use canopy_utils_mod,  ONLY: EffHenrysLawCoeff, LeBasMVGas, WaterRbw
@@ -218,7 +218,7 @@ contains
         REAL(RK),    INTENT( IN )       :: TEMP2               ! Mean temperature just above surface [K]
         REAL(RK),    INTENT( IN )       :: QV2                 ! Mean mixing ratio just above surface [kg/kg]
         REAL(RK),    INTENT( IN )       :: USTAR               ! Friction velocity at surface (m/s)
-
+        REAL(RK),    INTENT( IN )       :: RA                 ! Aerodynamic resistance (s/cm)
         INTEGER,     INTENT( IN )       :: DEP_IND            ! Gas deposition species index (depends on gas mech)
         REAL(RK),    INTENT( OUT )      :: DEP_OUT            ! Output soil layer gas dry deposition rate for each DEP_IND
 
@@ -272,7 +272,7 @@ contains
         !Rbw is invariant to species not layers
 
         !deposition velocity to water surfaces (cm/s)
-        DEP_OUT = 1.0/(rbw+rwaterl)
+        DEP_OUT = 1.0_rk/(rbw+rwaterl+RA)
 
         return
     END SUBROUTINE CANOPY_GAS_DRYDEP_WATER

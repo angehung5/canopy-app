@@ -80,4 +80,5 @@ MODULE canopy_canopts_mod
     real(rk)            ::    snowc_set    !Set default snow cover percent at grid/point, above which ground surface is treated as dominant snow (default = 50%)
     real(rk)            ::    icec_set     !Set default ice cover percent at grid/point, above which ground or water surface is treated as dominant ice (default = 50%)
     real(rk)            ::    gamma_set    !Set default reaction probability for gas dry deposition to different building surfaces (default = 5.0D-5)
+    real(rk)            ::    Ramin_set    !Set default minimum aerodynamic resistance (default = 10 s/m)
 END MODULE canopy_canopts_mod
