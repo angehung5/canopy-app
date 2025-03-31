@@ -23,6 +23,7 @@ SUBROUTINE canopy_calcs(nn)
     use canopy_phot_mod
     use canopy_eddy_mod
     use canopy_bioemi_mod
+    use canopy_drydep_mod
 
     IMPLICIT NONE
 
@@ -36,6 +37,8 @@ SUBROUTINE canopy_calcs(nn)
     REAL(rk) :: tsteplai            !Number of days between the past and current LAI
     !Historical Averaging variables for biogenics
     REAL(rk) :: dnewfrac,doldfrac,hnewfrac,holdfrac
+    !For aerodynamic resistance and gas dry dep
+    REAL(rk) :: RiB,Ra
     !Other
     REAL(rk) :: lat2d(nlon,nlat), lon2d(nlon,nlat), lat1d(nlon*nlat), lon1d(nlon*nlat)
 
@@ -96,6 +99,13 @@ SUBROUTINE canopy_calcs(nn)
                 soilw4ref      = variables_2d(i,j)%soilw4
                 wiltref        = variables_2d(i,j)%wilt
                 ozone_w126ref  = variables_2d(i,j)%ozone_w126
+                soilt1ref      = variables_2d(i,j)%soilt1
+                soilt2ref      = variables_2d(i,j)%soilt2
+                soilt3ref      = variables_2d(i,j)%soilt3
+                soilt4ref      = variables_2d(i,j)%soilt4
+                tmp_hyblev1ref = variables_2d(i,j)%tmp_hyblev1
+                snowc_averef   = variables_2d(i,j)%snowc_ave
+                icec_averef    = variables_2d(i,j)%icec
 
 ! ... calculate wind speed from u and v
                 ubzref   = sqrt((uref**2.0) + (vref**2.0))
@@ -110,18 +120,87 @@ SUBROUTINE canopy_calcs(nn)
                 if (cansublays .lt. 1) then !case where model resolution >= canopy height
                     cansublays=1            !only one layer allowed
                 end if
+! ... calculate initial canopy temp/pressure/humidity/density profiles from first guess approximations (i.e., no leaf energy balance)
+
+                do k=1, modlays
+                    !For temperature we use 1st model layer and 2-m temperatures to estimate lapse rate, not tmpsfc
+                    !which is too extreme in some global locations.
+                    tka_3d(i,j,k)=CalcTemp(zk(k)*100.0_rk, (hyblev1*100.0_rk) - 200.0_rk, &
+                        tmp_hyblev1ref-273.15_rk, tmp2mref-273.15_rk) ! temp    [K]
+                    pressa_3d(i,j,k)=CalcPressure(zk(k)*100.0_rk, 200.0_rk, pressfcref*0.01_rk, &
+                        tmp2mref, tmpsfcref)                                                                  ! press   [mb]
+                    relhuma_3d(i,j,k)=CalcRelHum(tka_3d(i,j,k),pressa_3d(i,j,k),spfh2mref*1000.0_rk)    ! relhum  [%]
+                    spechuma_3d(i,j,k)=CalcSpecHum(relhuma_3d(i,j,k),tka_3d(i,j,k),pressa_3d(i,j,k))     ! spechum [g/kg]
+                end do
+
 ! ... check for valid model vegetation types
                 if (lu_opt .eq. 0 .or. lu_opt .eq. 1 ) then !VIIRS or MODIS
-                    if (vtyperef .gt. 0 .and. vtyperef .le. 10 .or. vtyperef .eq. 12 &
+                    if (vtyperef .gt. 0 .and. vtyperef .le. 12 &
                         .or. vtyperef .eq. 14 .or. vtyperef .eq. 18 &
                         .or. vtyperef .eq. 19) then
 
-! ... check for ssg_opt from user namelist
-                        if (vtyperef .ge. 6 .and. vtyperef .le. 10) then !VIIRS/MODIS shrubs/savannas/grasses (SSG) type
-                            if (ssg_opt .eq. 0) then !use GEDI inputs for SSG heights (possibly not measured...)
+! ... check for can_opt from user namelist
+
+                        if (vtyperef .ge. 1 .and. vtyperef .le. 5 &
+                            .or. vtyperef .eq. 18 .or. vtyperef .eq. 19) then !!VIIRS/MODIS forest/tundra canopies
+                            if (can_opt .eq. 0) then !use inputs for canopy heights
                                 hcmref = hcmref
+                                canfracref = canfracref
+                                lairef = lairef
+                            else if (can_opt .eq. 1) then !user set constant canopy heights for forests/tundras
+                                !only used to overide valid vtypes with hcm<=0, canfrac<=0, or lai<=0.
+                                if (hcmref .le. 0.0) then
+                                    hcmref = can_chset
+                                else
+                                    hcmref = hcmref
+                                endif
+                                if (canfracref .le. 0.0) then
+                                    canfracref = can_cfset
+                                else
+                                    canfracref = canfracref
+                                endif
+                                if (lairef .le. 0.0) then
+                                    lairef = can_laiset
+                                else
+                                    lairef = lairef
+                                endif
+                                !recalculate
+                                zhc         = zk/hcmref
+                                cansublays  = min(floor(hcmref/modres),modlays)
+                                if (cansublays .lt. 1) then !case where model resolution >= canopy height
+                                    cansublays=1            !only one layer allowed
+                                end if
+                            else
+                                write(*,*)  'Wrong CAN_OPT choice of ', can_opt, &
+                                    ' in namelist...exiting'
+                                call exit(2)
+                            end if
+                        end if
+
+! ... check for ssg_opt from user namelist
+                        if (vtyperef .ge. 6 .and. vtyperef .le. 11) then !VIIRS/MODIS shrubs/savannas/grasses (SSG) type
+                            !includes wetlands!
+                            if (ssg_opt .eq. 0) then !use inputs for SSG (possibly not measured...)
+                                hcmref = hcmref
+                                canfracref = canfracref
+                                lairef = lairef
                             else if (ssg_opt .eq. 1) then !user set constant shrubs/savannas/grasslands height
-                                hcmref = ssg_set
+                                !only used to overide valid vtypes with hcm<=0, canfrac<=0, or lai<=0.
+                                if (hcmref .le. 0.0) then
+                                    hcmref = ssg_chset
+                                else
+                                    hcmref = hcmref
+                                endif
+                                if (canfracref .le. 0.0) then
+                                    canfracref = ssg_cfset
+                                else
+                                    canfracref = canfracref
+                                endif
+                                if (lairef .le. 0.0) then
+                                    lairef = ssg_laiset
+                                else
+                                    lairef = lairef
+                                endif
                                 !recalculate
                                 zhc         = zk/hcmref
                                 cansublays  = min(floor(hcmref/modres),modlays)
@@ -137,10 +216,27 @@ SUBROUTINE canopy_calcs(nn)
 
 ! ... check for crop_opt from user namelist
                         if (vtyperef .eq. 12 .or. vtyperef .eq. 14) then !VIIRS/MODIS crop types
-                            if (crop_opt .eq. 0) then !use GEDI inputs for crop height (possibly not measured...)
+                            if (crop_opt .eq. 0) then !use inputs for crop (possibly not measured...)
                                 hcmref = hcmref
+                                canfracref = canfracref
+                                lairef = lairef
                             else if (crop_opt .eq. 1) then !user set constant crop height
-                                hcmref = crop_set
+                                !only used to overide valid vtypes with hcm<=0, canfrac<=0, or lai<=0.
+                                if (hcmref .le. 0.0) then
+                                    hcmref = crop_chset
+                                else
+                                    hcmref = hcmref
+                                endif
+                                if (canfracref .le. 0.0) then
+                                    canfracref = crop_cfset
+                                else
+                                    canfracref = canfracref
+                                endif
+                                if (lairef .le. 0.0) then
+                                    lairef = crop_laiset
+                                else
+                                    lairef = lairef
+                                endif
                                 !recalculate
                                 zhc         = zk/hcmref
                                 cansublays  = min(floor(hcmref/modres),modlays)
@@ -187,16 +283,6 @@ SUBROUTINE canopy_calcs(nn)
                                         fafraczInt)
                                 end if
                             end if
-
-! ... calculate initial canopy temp/pressure/humidity/density profiles from first guess approximations (i.e., no leaf energy balance)
-
-                            do k=1, modlays
-                                tka_3d(i,j,k)=CalcTemp(zk(k)*100.0_rk, 200.0_rk, tmp2mref-273.15_rk, tmpsfcref-273.15_rk) ! temp    [K]
-                                pressa_3d(i,j,k)=CalcPressure(zk(k)*100.0_rk, 200.0_rk, pressfcref*0.01_rk, &
-                                    tmp2mref, tmpsfcref)                                                                  ! press   [mb]
-                                relhuma_3d(i,j,k)=CalcRelHum(tka_3d(i,j,k),pressa_3d(i,j,k),spfh2mref*1000.0_rk)    ! relhum  [%]
-                                spechuma_3d(i,j,k)=CalcSpecHum(relhuma_3d(i,j,k),tka_3d(i,j,k),pressa_3d(i,j,k))     ! spechum [g/kg]
-                            end do
 
 ! ... calculate leaf area density profile from foliage shape function for output (m2/m3)
                             do k=1, modlays
@@ -790,10 +876,1545 @@ SUBROUTINE canopy_calcs(nn)
                                 end if
                             end if
 
+! ... user option to calculate in-canopy dry deposition velocity
+                            if (ifcanddepgas ) then
+                                if (ifcanwind) then   !ubar needed for rbl
+                                    if (chemmechgas_opt .eq. 0)  then   !RACM2
+                                        if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
+                                            !At this point must have canopy height set by thresholds, so Ra calculation is valid
+                                            !Calculate Bulk Richardson Number for stability dependent aerodynamic resistance
+                                            RiB=CalcRiB(tmp2mref, tmpsfcref, ubzref*100.0_rk, &
+                                                d_h_2d(i,j)*hcmref*100.0_rk, (hcmref+hgtref)*100.0_rk)
+                                            Ra=rav(ubzref*100.0_rk, (hcmref+hgtref)*100.0_rk, d_h_2d(i,j)*hcmref*100.0_rk, &
+                                                hcmref*100.0_rk, RiB)
+                                            Ra = max(Ramin_set/100.0_rk,Ra) !Bound Ra minimum,and assume constant Ra
+                                            !downward at all levels through canopy to ground
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra, 1, ddep_no_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra, 1, ddep_no_3d(i,j,1))   ! [cm/s]
+                                                else !snow or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 1,ddep_no_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  2, ddep_no2_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra, 2, ddep_no2_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 2,ddep_no2_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref,  Ra, 3, ddep_o3_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref,  Ra, 3, ddep_o3_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 3,ddep_o3_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref,  Ra, 4, ddep_hono_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref,  Ra, 4, ddep_hono_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 4,ddep_hono_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref,  Ra, 5, ddep_hno4_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref,  Ra, 5, ddep_hno4_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 5,ddep_hno4_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  6, ddep_hno3_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  6, ddep_hno3_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 6,ddep_hno3_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref,  Ra, 7, ddep_n2o5_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  7, ddep_n2o5_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 7,ddep_n2o5_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  8, ddep_co_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref,  Ra, 8, ddep_co_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 8,ddep_co_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref,  Ra, 9, ddep_h2o2_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref,  Ra, 9, ddep_h2o2_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 9,ddep_h2o2_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref,  Ra, 10, ddep_ch4_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref,  Ra, 10, ddep_ch4_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 10,ddep_ch4_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref,  Ra, 11, ddep_mo2_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  11, ddep_mo2_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 11,ddep_mo2_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  12, ddep_op1_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,2), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  12, ddep_op1_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 12,ddep_op1_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  13, ddep_moh_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  13, ddep_moh_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 13,ddep_moh_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref,  Ra, 14, ddep_no3_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  14, ddep_no3_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 14,ddep_no3_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 15) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  15, ddep_o3p_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 15) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  15, ddep_o3p_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 15,ddep_o3p_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  16, ddep_o1d_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  16, ddep_o1d_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 16,ddep_o1d_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  17, ddep_ho_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  17, ddep_ho_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 17,ddep_ho_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  18, ddep_ho2_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  18, ddep_ho2_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 18,ddep_ho2_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  19, ddep_ora1_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref,  Ra, 19, ddep_ora1_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 19,ddep_ora1_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  20, ddep_hac_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  20, ddep_hac_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 20,ddep_hac_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  21, ddep_paa_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  21, ddep_paa_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 21,ddep_paa_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  22, ddep_dhmob_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  22, ddep_dhmob_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 22,ddep_dhmob_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  23, ddep_hpald_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  23, ddep_hpald_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 23,ddep_hpald_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  24, ddep_ishp_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  24, ddep_ishp_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 24,ddep_ishp_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  25, ddep_iepox_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  25, ddep_iepox_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 25,ddep_iepox_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  26, ddep_propnn_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  26, ddep_propnn_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 26,ddep_propnn_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  27, ddep_isopnb_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  27, ddep_isopnb_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 27,ddep_isopnb_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  28, ddep_isopnd_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  28, ddep_isopnd_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 28,ddep_isopnd_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  29, ddep_macrn_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  29, ddep_macrn_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 29,ddep_macrn_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  30, ddep_mvkn_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  30, ddep_mvkn_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 30,ddep_mvkn_3d(i,j,1))
+                                                end if
+                                            endif
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
+                                                call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                    zk, hcmref, tka_3d(i,j,:), pressa_3d(i,j,:), &
+                                                    relhuma_3d(i,j,:), fsun, ppfd_sun, ppfd_shade, canWIND_3d(i,j,:),  &
+                                                    dswrfref, Ra,  31, ddep_isnp_3d(i,j,:))   ! [cm/s]
+                                            endif
+                                            !soil gas dry depostion at level 1, i.e., z=0
+                                            if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
+                                                if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                    call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                        soilt1ref, pressa_3d(i,j,1), canWIND_3d(i,j,2),  &
+                                                        soilcat_opt,sotypref,soild1, soilw1ref, Ra,  31, ddep_isnp_3d(i,j,1))   ! [cm/s]
+                                                else !snow covered or ice covered
+                                                    call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                        canWIND_3d(i,j,2), Ra, 31,ddep_isnp_3d(i,j,1))
+                                                end if
+                                            endif
+                                        else
+                                            write(*,*)  'Wrong number of chemical species of ', chemmechgas_tot
+                                            write(*,*)  ' in namelist...exiting'
+                                            write(*,*)  'Set chemmechgas_tot = 31 for RACM2'
+                                            call exit(2)
+                                        end if
+                                    else
+                                        write(*,*)  'Wrong chemical mechanism option of ', chemmechgas_opt, ' in namelist...exiting'
+                                        write(*,*)  'Set chemmechgas_opt = 0 (RACM2) for now'
+                                        call exit(2)
+                                    end if
+                                else
+                                    write(*,*)  'Wrong IfCanWind choice of ', ifcanwind, ' in namelist...exiting'
+                                    write(*,*)  'Set IfCanwind to True to use IfCanDDepGas'
+                                    call exit(2)
+                                end if
+                            end if
+
                         end if !Contiguous Canopy
 
+                    else if (vtyperef .eq. 15 .or. vtyperef .eq. 16 .or. vtyperef .eq. 20) then !Barren/Sparsely Vegetated  or
+                        !Barren Tundra or Snow/Ice
+! ... user option to calculate dry deposition velocity...for land use outside of vegetated canopies
+                        if (ifcanddepgas ) then
+                            if (chemmechgas_opt .eq. 0)  then   !RACM2
+                                if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (hcmref .le. 0.0) then
+                                        hcmref = 0.01!m   (set to just above ground @ 1 cm; leads to z0 ~ 0.001 m
+                                    endif                ! needed for Ra calculation)
+                                    RiB=CalcRiB(tmp2mref, tmpsfcref, ubzref*100.0_rk, &
+                                        0.75_rk*hcmref*100.0_rk, (hcmref+hgtref)*100.0_rk) !assume d~3/4*Hc
+                                    Ra=rav(ubzref*100.0_rk, (hcmref+hgtref)*100.0_rk, 0.75_rk*hcmref*100.0_rk, &
+                                        hcmref*100.0_rk, RiB)
+                                    Ra = max(Ramin_set/100.0_rk,Ra) !Bound Ra minimum
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  1, ddep_no_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 1,ddep_no_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  2, ddep_no2_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 2,ddep_no2_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  3, ddep_o3_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 3,ddep_o3_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  4, ddep_hono_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 4,ddep_hono_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  5, ddep_hno4_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 5,ddep_hno4_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  6, ddep_hno3_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 6,ddep_hno3_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  7, ddep_n2o5_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 7,ddep_n2o5_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  8, ddep_co_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 8,ddep_co_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  9, ddep_h2o2_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 9,ddep_h2o2_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  10, ddep_ch4_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 10,ddep_ch4_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  11, ddep_mo2_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 11,ddep_mo2_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  12, ddep_op1_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 12,ddep_op1_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  13, ddep_moh_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 13,ddep_moh_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  14, ddep_no3_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 14,ddep_no3_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 15) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  15, ddep_o3p_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 15,ddep_o3p_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  16, ddep_o1d_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 16,ddep_o1d_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  17, ddep_ho_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 17,ddep_ho_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  18, ddep_ho2_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 18,ddep_ho2_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  19, ddep_ora1_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 19,ddep_ora1_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  20, ddep_hac_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 20,ddep_hac_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  21, ddep_paa_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 21,ddep_paa_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  22, ddep_dhmob_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 22,ddep_dhmob_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  23, ddep_hpald_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 23,ddep_hpald_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  24, ddep_ishp_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 24,ddep_ishp_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  25, ddep_iepox_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 25,ddep_iepox_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  26, ddep_propnn_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 26,ddep_propnn_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  27, ddep_isopnb_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 27,ddep_isopnb_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  28, ddep_isopnd_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 28,ddep_isopnd_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  29, ddep_macrn_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 29,ddep_macrn_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  30, ddep_mvkn_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 30,ddep_mvkn_3d(i,j,1))
+                                        endif
+                                    endif
+                                    !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                soilt1ref, pressa_3d(i,j,1), ubzref,  &
+                                                soilcat_opt,sotypref,soild1, soilw1ref, Ra,  31, ddep_isnp_3d(i,j,1))   ! [cm/s]
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 31,ddep_isnp_3d(i,j,1))
+                                        endif
+                                    endif
+                                else
+                                    write(*,*)  'Wrong number of chemical species of ', chemmechgas_tot
+                                    write(*,*)  ' in namelist...exiting'
+                                    write(*,*)  'Set chemmechgas_tot = 31 for RACM2'
+                                    call exit(2)
+                                end if
+                            else
+                                write(*,*)  'Wrong chemical mechanism option of ', chemmechgas_opt, ' in namelist...exiting'
+                                write(*,*)  'Set chemmechgas_opt = 0 (RACM2) for now'
+                                call exit(2)
+                            end if
+                        end if
+                    else if (vtyperef .eq. 13) then !Urban and Built Up
+! ... user option to calculate dry deposition velocity...for land use outside of vegetated canopies
+                        if (ifcanddepgas ) then
+                            if (chemmechgas_opt .eq. 0)  then   !RACM2
+                                if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
+                                    !urban gas dry depostion at level 1, i.e., z=0
+                                    if (hcmref .le. 0.0) then
+                                        hcmref = 0.01!m   (set to just above ground @ 1 cm; leads to z0 ~ 0.001 m
+                                    endif                ! needed for Ra calculation)
+                                    RiB=CalcRiB(tmp2mref, tmpsfcref, ubzref*100.0_rk, &
+                                        0.75_rk*hcmref*100.0_rk, (hcmref+hgtref)*100.0_rk) !assume d~3/4*Hc
+                                    Ra=rav(ubzref*100.0_rk, (hcmref+hgtref)*100.0_rk, 0.75_rk*hcmref*100.0_rk, &
+                                        hcmref*100.0_rk, RiB)
+                                    Ra = max(Ramin_set/100.0_rk,Ra) !Bound Ra minimum
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,1,ddep_no_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 1,ddep_no_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,2,ddep_no2_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 2,ddep_no2_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,3,ddep_o3_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 3,ddep_o3_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,4,ddep_hono_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 4,ddep_hono_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,5,ddep_hno4_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 5,ddep_hno4_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,6,ddep_hno3_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 6,ddep_hno3_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,7,ddep_n2o5_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 7,ddep_n2o5_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,8,ddep_co_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 8,ddep_co_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,9,ddep_h2o2_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 9,ddep_h2o2_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,10,ddep_ch4_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 10,ddep_ch4_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,11,ddep_mo2_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 11,ddep_mo2_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,12,ddep_op1_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 12,ddep_op1_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,13,ddep_moh_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 13,ddep_moh_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,14,ddep_no3_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 14,ddep_no3_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 15) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,15,ddep_o3p_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 15,ddep_o3p_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,16,ddep_o1d_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 16,ddep_o1d_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,17,ddep_ho_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 17,ddep_ho_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,18,ddep_ho2_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 18,ddep_ho2_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,19,ddep_ora1_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 19,ddep_ora1_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,20,ddep_hac_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 20,ddep_hac_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,21,ddep_paa_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 21,ddep_paa_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,22,ddep_dhmob_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 22,ddep_dhmob_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,23,ddep_hpald_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 23,ddep_hpald_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,24,ddep_ishp_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 24,ddep_ishp_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,25,ddep_iepox_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 25,ddep_iepox_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,26,ddep_propnn_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 26,ddep_propnn_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,27,ddep_isopnb_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 27,ddep_isopnb_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,28,ddep_isopnd_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 28,ddep_isopnd_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,29,ddep_macrn_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 29,ddep_macrn_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,30,ddep_mvkn_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 30,ddep_mvkn_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,tmp2mref,gamma_set, Ra,31,ddep_isnp_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 31,ddep_isnp_3d(i,j,1))
+                                        endif
+                                    endif
+                                else
+                                    write(*,*)  'Wrong number of chemical species of ', chemmechgas_tot
+                                    write(*,*)  ' in namelist...exiting'
+                                    write(*,*)  'Set chemmechgas_tot = 31 for RACM2'
+                                    call exit(2)
+                                end if
+                            else
+                                write(*,*)  'Wrong chemical mechanism option of ', chemmechgas_opt, ' in namelist...exiting'
+                                write(*,*)  'Set chemmechgas_opt = 0 (RACM2) for now'
+                                call exit(2)
+                            end if
+                        end if
+                    else if (vtyperef .eq. 0) then !Water from FV3 (usually vtype = 17 for water)
+! ... user option to calculate dry deposition velocity...for land use outside of vegetated canopies
+                        if (ifcanddepgas ) then
+                            if (chemmechgas_opt .eq. 0)  then   !RACM2
+                                if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
+                                    !water gas dry depostion at level 1, i.e., z=0
+                                    if (hcmref .le. 0.0) then
+                                        hcmref = 0.01!m   (set to just above ground @ 1 cm; leads to z0 ~ 0.001 m
+                                    endif                ! needed for Ra calculation)
+                                    RiB=CalcRiB(tmp2mref, tmpsfcref, ubzref*100.0_rk, &
+                                        0.75_rk*hcmref*100.0_rk, (hcmref+hgtref)*100.0_rk) !assume d~3/4*Hc
+                                    Ra=rav(ubzref*100.0_rk, (hcmref+hgtref)*100.0_rk, 0.75_rk*hcmref*100.0_rk, &
+                                        hcmref*100.0_rk, RiB)
+                                    Ra = max(Ramin_set/100.0_rk,Ra) !Bound Ra minimum
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,1,ddep_no_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 1,ddep_no_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,2,ddep_no2_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 2,ddep_no2_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,3,ddep_o3_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 3,ddep_o3_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,4,ddep_hono_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 4,ddep_hono_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,5,ddep_hno4_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 5,ddep_hno4_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,6,ddep_hno3_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 6,ddep_hno3_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,7,ddep_n2o5_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 7,ddep_n2o5_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,8,ddep_co_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 8,ddep_co_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,9,ddep_h2o2_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 9,ddep_h2o2_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,10,ddep_ch4_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 10,ddep_ch4_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,11,ddep_mo2_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 11,ddep_mo2_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,12,ddep_op1_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 12,ddep_op1_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,13,ddep_moh_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 13,ddep_moh_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,14,ddep_no3_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 14,ddep_no3_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 15) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,15,ddep_o3p_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 15,ddep_o3p_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,16,ddep_o1d_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 16,ddep_o1d_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,17,ddep_ho_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 17,ddep_ho_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,18,ddep_ho2_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref,  Ra,18,ddep_ho2_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,19,ddep_ora1_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 19,ddep_ora1_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,20,ddep_hac_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 20,ddep_hac_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,21,ddep_paa_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 21,ddep_paa_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,22,ddep_dhmob_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 22,ddep_dhmob_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,23,ddep_hpald_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 23,ddep_hpald_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,24,ddep_ishp_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 24,ddep_ishp_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,25,ddep_iepox_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 25,ddep_iepox_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,26,ddep_propnn_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 26,ddep_propnn_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,27,ddep_isopnb_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 27,ddep_isopnb_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,28,ddep_isopnd_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 28,ddep_isopnd_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,29,ddep_macrn_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 29,ddep_macrn_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,30,ddep_mvkn_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 30,ddep_mvkn_3d(i,j,1))
+                                        endif
+                                    endif
+                                    if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
+                                        if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                            call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                                tmp2mref,spfh2mref,ustref, Ra,31,ddep_isnp_3d(i,j,1))
+                                        else  !snow covered or ice covered
+                                            call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                ubzref, Ra, 31,ddep_isnp_3d(i,j,1))
+                                        endif
+                                    endif
+                                else
+                                    write(*,*)  'Wrong number of chemical species of ', chemmechgas_tot
+                                    write(*,*)  ' in namelist...exiting'
+                                    write(*,*)  'Set chemmechgas_tot = 31 for RACM2'
+                                    call exit(2)
+                                end if
+                            else
+                                write(*,*)  'Wrong chemical mechanism option of ', chemmechgas_opt, ' in namelist...exiting'
+                                write(*,*)  'Set chemmechgas_opt = 0 (RACM2) for now'
+                                call exit(2)
+                            end if
+                        end if
                     else
-!                        write(*,*)  'Warning VIIRS/MODIS VTYPE ', vtyperef, ' is not supported...continue'
+                        write(*,*)  'Warning VIIRS/MODIS VTYPE ', vtyperef, ' is not supported...continue'
                     end if   !Vegetation types
                 else
                     write(*,*)  'Wrong LU_OPT choice of ', lu_opt, ' in namelist...exiting'
@@ -851,6 +2472,13 @@ SUBROUTINE canopy_calcs(nn)
             soilw4ref      = variables(loc)%soilw4
             wiltref        = variables(loc)%wilt
             ozone_w126ref  = variables(loc)%ozone_w126
+            soilt1ref      = variables(loc)%soilt1
+            soilt2ref      = variables(loc)%soilt2
+            soilt3ref      = variables(loc)%soilt3
+            soilt4ref      = variables(loc)%soilt4
+            tmp_hyblev1ref = variables(loc)%tmp_hyblev1
+            snowc_averef   = variables(loc)%snowc_ave
+            icec_averef    = variables(loc)%icec
 
             if (var3d_opt .eq. 1) then !allocated so set
                 pavd_arr     = (/variables_can(loc)%pavd01, &
@@ -897,18 +2525,87 @@ SUBROUTINE canopy_calcs(nn)
                 cansublays=1            !only one layer allowed
             end if
 
+! ... calculate initial canopy temp/pressure/humidity/density profiles from first guess approximations (i.e., no leaf energy balance)
+
+            do k=1, modlays
+                !For temperature we use 1st model layer and 2-m temperatures to estimate lapse rate, not tmpsfc
+                !which is too extreme in some global locations.
+                tka(loc,k)=CalcTemp(zk(k)*100.0_rk, (hyblev1*100.0_rk) - 200.0_rk, &
+                    tmp_hyblev1ref-273.15_rk, tmp2mref-273.15_rk) ! temp    [K]
+                pressa(loc,k)=CalcPressure(zk(k)*100.0_rk, 200.0_rk, pressfcref*0.01_rk, &
+                    tmp2mref, tmpsfcref)                                                               ! press   [mb]
+                relhuma(loc,k)=CalcRelHum(tka(loc,k),pressa(loc,k),spfh2mref*1000.0_rk)          ! relhum  [%]
+                spechuma(loc,k)=CalcSpecHum(relhuma(loc,k),tka(loc,k),pressa(loc,k))              ! spechum [g/kg]
+            end do
+
 ! ... check for valid model vegetation types
             if (lu_opt .eq. 0 .or. lu_opt .eq. 1 ) then !VIIRS or MODIS
-                if (vtyperef .gt. 0 .and. vtyperef .le. 10 .or. vtyperef .eq. 12 &
+                if (vtyperef .gt. 0 .and. vtyperef .le. 12 &
                     .or. vtyperef .eq. 14 .or. vtyperef .eq. 18 &
                     .or. vtyperef .eq. 19) then
 
+
+! ... check for can_opt from user namelist
+                    if (vtyperef .ge. 1 .and. vtyperef .le. 5 &
+                        .or. vtyperef .eq. 18 .or. vtyperef .eq. 19) then !!VIIRS/MODIS forest/tundra canopies
+                        if (can_opt .eq. 0) then !use inputs for canopy heights
+                            hcmref = hcmref
+                            canfracref = canfracref
+                            lairef = lairef
+                        else if (can_opt .eq. 1) then !user set constant canopy heights for forests/tundras
+                            !only used to overide valid vtypes with hcm<=0, canfrac<=0, or lai<=0.
+                            if (hcmref .le. 0.0) then
+                                hcmref = can_chset
+                            else
+                                hcmref = hcmref
+                            endif
+                            if (canfracref .le. 0.0) then
+                                canfracref = can_cfset
+                            else
+                                canfracref = canfracref
+                            endif
+                            if (lairef .le. 0.0) then
+                                lairef = can_laiset
+                            else
+                                lairef = lairef
+                            endif
+                            !recalculate
+                            zhc         = zk/hcmref
+                            cansublays  = min(floor(hcmref/modres),modlays)
+                            if (cansublays .lt. 1) then !case where model resolution >= canopy height
+                                cansublays=1            !only one layer allowed
+                            end if
+                        else
+                            write(*,*)  'Wrong CAN_OPT choice of ', can_opt, &
+                                ' in namelist...exiting'
+                            call exit(2)
+                        end if
+                    end if
+
 ! ... check for ssg_opt from user namelist
-                    if (vtyperef .ge. 6 .and. vtyperef .le. 10) then !VIIRS/MODIS shrubs/savannas/grasses (SSG) type
+                    if (vtyperef .ge. 6 .and. vtyperef .le. 11) then !VIIRS/MODIS shrubs/savannas/grasses (SSG) type
+                        !Includes wetlands!
                         if (ssg_opt .eq. 0) then !use GEDI inputs for SSG heights (possibly not measured...)
                             hcmref = hcmref
+                            canfracref = canfracref
+                            lairef = lairef
                         else if (ssg_opt .eq. 1) then !user set constant shrubs/savannas/grasslands height
-                            hcmref = ssg_set
+                            !only used to overide valid vtypes with hcm<=0, canfrac<=0, or lai<=0.
+                            if (hcmref .le. 0.0) then
+                                hcmref = ssg_chset
+                            else
+                                hcmref = hcmref
+                            endif
+                            if (canfracref .le. 0.0) then
+                                canfracref = ssg_cfset
+                            else
+                                canfracref = canfracref
+                            endif
+                            if (lairef .le. 0.0) then
+                                lairef = ssg_laiset
+                            else
+                                lairef = lairef
+                            endif
                             !recalculate
                             zhc         = zk/hcmref
                             cansublays  = min(floor(hcmref/modres),modlays)
@@ -926,8 +2623,25 @@ SUBROUTINE canopy_calcs(nn)
                     if (vtyperef .eq. 12 .or. vtyperef .eq. 14) then !VIIRS/MODIS crop type
                         if (crop_opt .eq. 0) then !use GEDI inputs for crop height
                             hcmref = hcmref
+                            canfracref = canfracref
+                            lairef = lairef
                         else if (crop_opt .eq. 1) then !user set constant crop height
-                            hcmref = crop_set
+                            !only used to overide valid vtypes with hcm<=0, canfrac<=0, or lai<=0.
+                            if (hcmref .le. 0.0) then
+                                hcmref = crop_chset
+                            else
+                                hcmref = hcmref
+                            endif
+                            if (canfracref .le. 0.0) then
+                                canfracref = crop_cfset
+                            else
+                                canfracref = canfracref
+                            endif
+                            if (lairef .le. 0.0) then
+                                lairef = crop_laiset
+                            else
+                                lairef = lairef
+                            endif
                             !recalculate
                             zhc         = zk/hcmref
                             cansublays  = min(floor(hcmref/modres),modlays)
@@ -978,16 +2692,6 @@ SUBROUTINE canopy_calcs(nn)
                                     fafraczInt)
                             end if
                         end if
-
-! ... calculate initial canopy temp/pressure/humidity/density profiles from first guess approximations (i.e., no leaf energy balance)
-
-                        do k=1, modlays
-                            tka(loc,k)=CalcTemp(zk(k)*100.0_rk, 200.0_rk, tmp2mref-273.15_rk, tmpsfcref-273.15_rk) ! temp    [K]
-                            pressa(loc,k)=CalcPressure(zk(k)*100.0_rk, 200.0_rk, pressfcref*0.01_rk, &
-                                tmp2mref, tmpsfcref)                                                               ! press   [mb]
-                            relhuma(loc,k)=CalcRelHum(tka(loc,k),pressa(loc,k),spfh2mref*1000.0_rk)          ! relhum  [%]
-                            spechuma(loc,k)=CalcSpecHum(relhuma(loc,k),tka(loc,k),pressa(loc,k))              ! spechum [g/kg]
-                        end do
 
 ! ... calculate leaf area density profile from foliage shape function for output (m2/m3)
                         do k=1, modlays
@@ -1580,10 +3284,1544 @@ SUBROUTINE canopy_calcs(nn)
                             end if
                         end if
 
+! ... user option to calculate in-canopy dry deposition velocity
+                        if (ifcanddepgas ) then
+                            if (ifcanwind) then   !ubar needed for rbl
+                                if (chemmechgas_opt .eq. 0) then   !RACM2
+                                    if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
+                                        !At this point must have canopy height set by thresholds, so Ra calculation is valid
+                                        !Calculate Bulk Richardson Number for stability dependent aerodynamic resistance
+                                        RiB=CalcRiB(tmp2mref, tmpsfcref, ubzref*100.0_rk, &
+                                            d_h(loc)*hcmref*100.0_rk, (hcmref+hgtref)*100.0_rk)
+                                        Ra=rav(ubzref*100.0_rk, (hcmref+hgtref)*100.0_rk, d_h(loc)*hcmref*100.0_rk, &
+                                            hcmref*100.0_rk, RiB)
+                                        Ra = max(Ramin_set/100.0_rk,Ra) !Bound Ra minimum,and assume constant Ra
+                                        !downward at all levels through canopy to ground
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 1, ddep_no(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra, 1, ddep_no(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 1,ddep_no(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 2, ddep_no2(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  2, ddep_no2(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 2,ddep_no2(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 3, ddep_o3(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  3, ddep_o3(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 3,ddep_o3(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 4, ddep_hono(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  4, ddep_hono(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 4,ddep_hono(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 5, ddep_hno4(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  5, ddep_hno4(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 5,ddep_hno4(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 6, ddep_hno3(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  6, ddep_hno3(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 6,ddep_hno3(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 7, ddep_n2o5(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  7, ddep_n2o5(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 7,ddep_n2o5(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 8, ddep_co(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  8, ddep_co(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 8,ddep_co(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 9, ddep_h2o2(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  9, ddep_h2o2(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 9,ddep_h2o2(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref,  Ra,10, ddep_ch4(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  10, ddep_ch4(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 10,ddep_ch4(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 11, ddep_mo2(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  11, ddep_mo2(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 11,ddep_mo2(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 12, ddep_op1(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref,  Ra, 12, ddep_op1(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 12,ddep_op1(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 13, ddep_moh(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  13, ddep_moh(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 13,ddep_moh(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 14, ddep_no3(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  14, ddep_no3(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 14,ddep_no3(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt ==15) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 15, ddep_o3p(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 15) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  15, ddep_o3p(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 15,ddep_o3p(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 16, ddep_o1d(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  16, ddep_o1d(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 16,ddep_o1d(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 17, ddep_ho(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  17, ddep_ho(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 17,ddep_ho(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 18, ddep_ho2(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  18, ddep_ho2(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 18,ddep_ho2(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 19, ddep_ora1(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  19, ddep_ora1(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 19,ddep_ora1(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 20, ddep_hac(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  20, ddep_hac(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 20,ddep_hac(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 21, ddep_paa(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  21, ddep_paa(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 21,ddep_paa(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 22, ddep_dhmob(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  22, ddep_dhmob(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 22,ddep_dhmob(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 23, ddep_hpald(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  23, ddep_hpald(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 23,ddep_hpald(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 24, ddep_ishp(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  24, ddep_ishp(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 24,ddep_ishp(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 25, ddep_iepox(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  25, ddep_iepox(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 25,ddep_iepox(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 26, ddep_propnn(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  26, ddep_propnn(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 26,ddep_propnn(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 27, ddep_isopnb(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  27, ddep_isopnb(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 27,ddep_isopnb(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 28, ddep_isopnd(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  28, ddep_isopnd(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 28,ddep_isopnd(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 29, ddep_macrn(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  29, ddep_macrn(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 29,ddep_macrn(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 30, ddep_mvkn(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  30, ddep_mvkn(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 30,ddep_mvkn(loc,1))
+                                            end if
+                                        endif
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
+                                            call canopy_gas_drydep_zhang(chemmechgas_opt,chemmechgas_tot, &
+                                                zk, hcmref, tka(loc,:), pressa(loc,:), &
+                                                relhuma(loc,:), fsun, ppfd_sun, ppfd_shade, canWIND(loc,:),  &
+                                                dswrfref, Ra, 31, ddep_isnp(loc,:))   ! [cm/s]
+                                        endif
+                                        !soil gas dry depostion at level 1, i.e., z=0
+                                        if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
+                                            if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                                call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                                    soilt1ref, pressa(loc,1), canWIND(loc,2),  &
+                                                    soilcat_opt,sotypref,soild1, soilw1ref, Ra,  31, ddep_isnp(loc,1))   ! [cm/s]
+                                            else !snow covered  or ice covered
+                                                call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                                    canWIND(loc,2),Ra, 31,ddep_isnp(loc,1))
+                                            end if
+                                        endif
+                                    else
+                                        write(*,*)  'Wrong number of chemical species of ', chemmechgas_tot
+                                        write(*,*) ' in namelist...exiting'
+                                        write(*,*)  'Set chemmechgas_tot = 31 for RACM2'
+                                        call exit(2)
+                                    end if
+                                else
+                                    write(*,*)  'Wrong chemical mechanism option of ', chemmechgas_opt, ' in namelist...exiting'
+                                    write(*,*)  'Set chemmechgas_opt to only 0 (RACM2) for now'
+                                    call exit(2)
+                                end if
+                            else
+                                write(*,*)  'Wrong IfCanWind choice of ', ifcanwind, ' in namelist...exiting'
+                                write(*,*)  'Set IfCanwind to True to use IfCanDDepGas'
+                                call exit(2)
+                            end if
+                        end if
                     end if !Contiguous Canopy
 
+                else if (vtyperef .eq. 15 .or. vtyperef .eq. 16 .or. vtyperef .eq. 20) then !Barren/Sparsely Vegetated  or Barren
+                    !Tundra or Snow/Ice
+! ... user option to calculate dry deposition velocity...for land use outside of vegetated canopies
+                    if (ifcanddepgas ) then
+                        if (chemmechgas_opt .eq. 0)  then   !RACM2
+                            if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (hcmref .le. 0.0) then
+                                    hcmref = 0.01!m   (set to just above ground @ 1 cm; leads to z0 ~ 0.001 m
+                                endif                ! needed for Ra calculation)
+                                RiB=CalcRiB(tmp2mref, tmpsfcref, ubzref*100.0_rk, &
+                                    0.75_rk*hcmref*100.0_rk, (hcmref+hgtref)*100.0_rk) !assume d~3/4*Hc
+                                Ra=rav(ubzref*100.0_rk, (hcmref+hgtref)*100.0_rk, 0.75_rk*hcmref*100.0_rk, &
+                                    hcmref*100.0_rk, RiB)
+                                Ra = max(Ramin_set/100.0_rk,Ra) !Bound Ra minimum
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  1, ddep_no(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 1,ddep_no(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref,  Ra, 2, ddep_no2(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 2,ddep_no2(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  3, ddep_o3(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 3,ddep_o3(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  4, ddep_hono(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 4,ddep_hono(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  5, ddep_hno4(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 5,ddep_hno4(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  6, ddep_hno3(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 6,ddep_hno3(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  7, ddep_n2o5(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 7,ddep_n2o5(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  8, ddep_co(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 8,ddep_co(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  9, ddep_h2o2(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 9,ddep_h2o2(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  10, ddep_ch4(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 10,ddep_ch4(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  11, ddep_mo2(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 11,ddep_mo2(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref,  Ra, 12, ddep_op1(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 12,ddep_op1(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  13, ddep_moh(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 13,ddep_moh(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  14, ddep_no3(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 14,ddep_no3(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 15) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  15, ddep_o3p(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 15,ddep_o3p(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  16, ddep_o1d(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 16,ddep_o1d(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  17, ddep_ho(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 17,ddep_ho(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  18, ddep_ho2(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 18,ddep_ho2(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  19, ddep_ora1(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 19,ddep_ora1(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  20, ddep_hac(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 20,ddep_hac(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  21, ddep_paa(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 21,ddep_paa(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  22, ddep_dhmob(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 22,ddep_dhmob(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  23, ddep_hpald(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 23,ddep_hpald(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  24, ddep_ishp(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 24,ddep_ishp(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  25, ddep_iepox(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 25,ddep_iepox(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  26, ddep_propnn(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 26,ddep_propnn(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  27, ddep_isopnb(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 27,ddep_isopnb(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  28, ddep_isopnd(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 28,ddep_isopnd(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  29, ddep_macrn(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 29,ddep_macrn(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  30, ddep_mvkn(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 30,ddep_mvkn(loc,1))
+                                    end if
+                                endif
+                                !soil (barren land) gas dry depostion at level 1, i.e., z=0
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_soil(chemmechgas_opt,chemmechgas_tot, &
+                                            soilt1ref, pressa(loc,1), ubzref,  &
+                                            soilcat_opt,sotypref,soild1, soilw1ref, Ra,  31, ddep_isnp(loc,1))   ! [cm/s]
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 31,ddep_isnp(loc,1))
+                                    end if
+                                endif
+                            else
+                                write(*,*)  'Wrong number of chemical species of ', chemmechgas_tot
+                                write(*,*)  ' in namelist...exiting'
+                                write(*,*)  'Set chemmechgas_tot = 31 for RACM2'
+                                call exit(2)
+                            end if
+                        else
+                            write(*,*)  'Wrong chemical mechanism option of ', chemmechgas_opt, ' in namelist...exiting'
+                            write(*,*)  'Set chemmechgas_opt = 0 (RACM2) for now'
+                            call exit(2)
+                        end if
+                    end if
+                else if (vtyperef .eq. 13) then !Urban and Built Up
+! ... user option to calculate dry deposition velocity...for land use outside of vegetated canopies
+                    if (ifcanddepgas ) then
+                        if (chemmechgas_opt .eq. 0)  then   !RACM2
+                            if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
+                                !urban gas dry depostion at level 1, i.e., z=0
+                                if (hcmref .le. 0.0) then
+                                    hcmref = 0.01!m   (set to just above ground @ 1 cm; leads to z0 ~ 0.001 m
+                                endif                ! needed for Ra calculation)
+                                RiB=CalcRiB(tmp2mref, tmpsfcref, ubzref*100.0_rk, &
+                                    0.75_rk*hcmref*100.0_rk, (hcmref+hgtref)*100.0_rk) !assume d~3/4*Hc
+                                Ra=rav(ubzref*100.0_rk, (hcmref+hgtref)*100.0_rk, 0.75_rk*hcmref*100.0_rk, &
+                                    hcmref*100.0_rk, RiB)
+                                Ra = max(Ramin_set/100.0_rk,Ra) !Bound Ra minimum
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra, 1,ddep_no(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 1,ddep_no(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra, 2,ddep_no2(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 2,ddep_no2(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra, 3,ddep_o3(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 3,ddep_o3(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,4,ddep_hono(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 4,ddep_hono(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,5,ddep_hno4(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 5,ddep_hno4(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,6,ddep_hno3(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 6,ddep_hno3(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,7,ddep_n2o5(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 7,ddep_n2o5(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,8,ddep_co(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 8,ddep_co(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,9,ddep_h2o2(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 9,ddep_h2o2(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,10,ddep_ch4(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 10,ddep_ch4(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,11,ddep_mo2(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 11,ddep_mo2(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,12,ddep_op1(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 12,ddep_op1(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,13,ddep_moh(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 13,ddep_moh(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,14,ddep_no3(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 14,ddep_no3(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 15) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,15,ddep_o3p(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 15,ddep_o3p(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,16,ddep_o1d(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 16,ddep_o1d(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,17,ddep_ho(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 17,ddep_ho(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,18,ddep_ho2(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 18,ddep_ho2(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,19,ddep_ora1(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 19,ddep_ora1(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,20,ddep_hac(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 20,ddep_hac(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,21,ddep_paa(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 21,ddep_paa(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,22,ddep_dhmob(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 22,ddep_dhmob(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,23,ddep_hpald(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 23,ddep_hpald(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,24,ddep_ishp(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 24,ddep_ishp(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,25,ddep_iepox(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 25,ddep_iepox(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,26,ddep_propnn(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 26,ddep_propnn(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,27,ddep_isopnb(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 27,ddep_isopnb(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,28,ddep_isopnd(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 28,ddep_isopnd(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,29,ddep_macrn(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 29,ddep_macrn(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,30,ddep_mvkn(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 30,ddep_mvkn(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_urban(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref,tmp2mref,gamma_set, Ra,31,ddep_isnp(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 31,ddep_isnp(loc,1))
+                                    end if
+                                endif
+                            else
+                                write(*,*)  'Wrong number of chemical species of ', chemmechgas_tot
+                                write(*,*)  ' in namelist...exiting'
+                                write(*,*)  'Set chemmechgas_tot = 31 for RACM2'
+                                call exit(2)
+                            end if
+                        else
+                            write(*,*)  'Wrong chemical mechanism option of ', chemmechgas_opt, ' in namelist...exiting'
+                            write(*,*)  'Set chemmechgas_opt = 0 (RACM2) for now'
+                            call exit(2)
+                        end if
+                    end if
+                else if (vtyperef .eq. 0) then !Water from FV3 (usually vtype = 17 for water)
+! ... user option to calculate dry deposition velocity...for land use outside of vegetated canopies
+                    if (ifcanddepgas ) then
+                        if (chemmechgas_opt .eq. 0)  then   !RACM2
+                            if (chemmechgas_tot .eq. 31) then   !RACM2=31 total gas species including transport
+                                !water gas dry depostion at level 1, i.e., z=0
+                                if (hcmref .le. 0.0) then
+                                    hcmref = 0.01!m   (set to just above ground @ 1 cm; leads to z0 ~ 0.001 m
+                                endif                ! needed for Ra calculation)
+                                RiB=CalcRiB(tmp2mref, tmpsfcref, ubzref*100.0_rk, &
+                                    0.75_rk*hcmref*100.0_rk, (hcmref+hgtref)*100.0_rk) !assume d~3/4*Hc
+                                Ra=rav(ubzref*100.0_rk, (hcmref+hgtref)*100.0_rk, 0.75_rk*hcmref*100.0_rk, &
+                                    hcmref*100.0_rk, RiB)
+                                Ra = max(Ramin_set/100.0_rk,Ra) !Bound Ra minimum
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 1) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,1,ddep_no(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 1,ddep_no(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 2) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,2,ddep_no2(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 2,ddep_no2(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 3) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,3,ddep_o3(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 3,ddep_o3(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 4) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,4,ddep_hono(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 4,ddep_hono(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 5) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,5,ddep_hno4(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 5,ddep_hno4(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 6) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,6,ddep_hno3(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 6,ddep_hno3(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 7) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,7,ddep_n2o5(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 7,ddep_n2o5(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 8) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,8,ddep_co(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 8,ddep_co(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 9) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,9,ddep_h2o2(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 9,ddep_h2o2(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 10) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,10,ddep_ch4(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 10,ddep_ch4(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 11) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,11,ddep_mo2(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 11,ddep_mo2(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 12) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,12,ddep_op1(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 12,ddep_op1(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 13) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,13,ddep_moh(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 13,ddep_moh(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 14) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,14,ddep_no3(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 14,ddep_no3(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 15) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,15,ddep_o3p(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 15,ddep_o3p(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 16) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,16,ddep_o1d(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 16,ddep_o1d(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 17) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,17,ddep_ho(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 17,ddep_ho(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 18) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,18,ddep_ho2(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 18,ddep_ho2(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 19) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,19,ddep_ora1(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 19,ddep_ora1(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 20) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,20,ddep_hac(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 20,ddep_hac(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 21) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,21,ddep_paa(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 21,ddep_paa(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 22) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,22,ddep_dhmob(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 22,ddep_dhmob(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 23) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,23,ddep_hpald(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 23,ddep_hpald(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 24) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,24,ddep_ishp(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 24,ddep_ishp(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 25) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,25,ddep_iepox(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 25,ddep_iepox(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 26) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,26,ddep_propnn(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 26,ddep_propnn(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 27) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,27,ddep_isopnb(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 27,ddep_isopnb(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 28) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,28,ddep_isopnd(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 28,ddep_isopnd(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 29) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,29,ddep_macrn(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 29,ddep_macrn(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 30) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,30,ddep_mvkn(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 30,ddep_mvkn(loc,1))
+                                    end if
+                                endif
+                                if (ddepspecgas_opt == 0 .or. ddepspecgas_opt == 31) then
+                                    if (snowc_averef .le. snowc_set .and. icec_averef*100.0_rk .le. icec_set) then
+                                        call canopy_gas_drydep_water(chemmechgas_opt,chemmechgas_tot, &
+                                            tmp2mref,spfh2mref,ustref, Ra,31,ddep_isnp(loc,1))
+                                    else !snow covered  or ice covered
+                                        call canopy_gas_drydep_snow(chemmechgas_opt,chemmechgas_tot, &
+                                            ubzref, Ra, 31,ddep_isnp(loc,1))
+                                    end if
+                                endif
+                            else
+                                write(*,*)  'Wrong number of chemical species of ', chemmechgas_tot
+                                write(*,*)  ' in namelist...exiting'
+                                write(*,*)  'Set chemmechgas_tot = 31 for RACM2'
+                                call exit(2)
+                            end if
+                        else
+                            write(*,*)  'Wrong chemical mechanism option of ', chemmechgas_opt, ' in namelist...exiting'
+                            write(*,*)  'Set chemmechgas_opt = 0 (RACM2) for now'
+                            call exit(2)
+                        end if
+                    end if
                 else
-!                    write(*,*)  'Warning VIIRS/MODIS VTYPE ', vtyperef, ' is not supported...continue'
+                    write(*,*)  'Warning VIIRS/MODIS VTYPE ', vtyperef, ' is not supported...continue'
                 end if   !Vegetation types
             else
                 write(*,*)  'Wrong LU_OPT choice of ', lu_opt, ' in namelist...exiting'

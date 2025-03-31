@@ -10,7 +10,13 @@
 
 Repository for low-level, stand-alone/column canopy parameterizations for testing and application to gridded atmospheric composition/air quality models.
 
-Authors: Patrick Campbell, Zachary Moon, and Wei-Ting Hung
+Authors: Patrick Campbell, Zachary Moon, Wei-Ting Hung, Margaret Marvin, Quazi Rasool, and other NOAA research team members.
+
+##  Coming Soon
+
+### ReadTheDocs Documentation
+
+https://canopy-app.readthedocs.io/en/latest/
 
 ## Getting Started
 
@@ -83,6 +89,13 @@ Current Canopy-App components:
 
     - `canopy_bioemi_mod.F90`
 
+
+5.  In-Canopy leaf-level gas dry deposition (cm s-1). Based on the revised parameterization for gaseous dry deposition from Zhang et al. (2003), and adapted from the Atmospheric Chemistry and Canopy Exchange Simulation System (ACCESS), Saylor (2013).
+
+Namelist Option : `ifcanddepgas`   Output Variables: see [Table 2](#table-2-canopy-app-gas-dry-deposition-output-variables-racm2) below for the Regional Atmospheric Chemistry Model, version 2 (RACM2) [Goliff et al., 2013](https://doi.org/10.1016/j.atmosenv.2012.11.038) gas phase chemical mechanism (currently only option) including transported species
+
+    - `canopy_drydep_mod.F90`
+
 ## Outputs
 
 Namelist Option : `file_out`  Prefix string (e.g., `'test'`) used to name output file (Output is 1D txt when using input 1D data (i.e., `infmt_opt=1`), or is 2D NetCDF output when 2D NetCDF input is used (i.e., `infmt_opt=0`)).
@@ -118,6 +131,43 @@ Current 2D fields includes the Wind Adjustment Factor (`waf`), flame heights (`f
 | `emi_svoc`    | Stress VOC emissions (15 compounds, Table 1 Guenther et al. (2012) | 18        |
 | `emi_ovoc`    | Other VOC emissions (49 compounds, Table 1 Guenther et al. (2012) | 19        |
 
+### Table 2. Canopy-App Gas Dry Deposition Output Variables RACM2
+
+| Variable Name | Variable Description (Units: cm s-1)      | ID Number |
+| ------------- | ----------------------------------------- | --------- |
+| `ddep_no`     | Nitric Oxide                                       | 1         |
+| `ddep_no2`    | Nitrogen Dioxide                                   | 2         |
+| `ddep_o3`     | Ozone                                              | 3         |
+| `ddep_hono`   | Nitrous Acid                                       | 4         |
+| `ddep_hno4`   | Peroxynitric Acid                                  | 5         |
+| `ddep_hno3`   | Nitric Acid                                        | 6         |
+| `ddep_n2o5`   | Dinitrogen Pentoxide                               | 7         |
+| `ddep_co`     | Carbon Monoxide                                    | 8         |
+| `ddep_h2o2`   | Hydrogen Peroxide                                  | 9         |
+| `ddep_ch4`    | Methane                                            | 10        |
+| `ddep_mo2`    | Methylperoxy Radical                               | 11        |
+| `ddep_op1`    | Methyl Hydrogen Peroxide                           | 12        |
+| `ddep_moh`    | Methanol                                           | 13        |
+| `ddep_no3`    | Nitrate Radical                                    | 14        |
+| `ddep_o3p`    | Ground State Oxygen Atoms                          | 15        |
+| `ddep_o1d`    | Excited State Oxygen Atoms                         | 16        |
+| `ddep_ho`     | Hydroxyl Radical                                   | 17        |
+| `ddep_ho2`    | Hydroperoxyl Radical                               | 18        |
+| `ddep_ora1`   | Formic Acid                                        | 19        |
+| `ddep_hac`    | Acetic Acid                                        | 20        |
+| `ddep_paa`    | Peroxyacetic Acid                                  | 21        |
+| `ddep_dhmob`  | Dihydroxy Carbonyl                                 | 22        |
+| `ddep_hpald`  | Hydroperoxymethyl-Butenals                         | 23        |
+| `ddep_ishp`   | Beta-Hydroxy Hydroperoxides from ISOP+HO2          | 24        |
+| `ddep_iepox`  | Isoprene Epoxydiol                                 | 25        |
+| `ddep_propnn` | Propanone Nitrate                                  | 26        |
+| `ddep_isopnb` | Beta-Hydroxy Isoprene Nitrates                     | 27        |
+| `ddep_isopnd` | Delta-Hydroxy Isoprene Nitrates                    | 28        |
+| `ddep_macrn`  | Methacrolein Nitrate                               | 29        |
+| `ddep_mvkn`   | Methylvinylketone Nitrate                          | 30        |
+| `ddep_isnp`   | ISNP                                               | 31        |
+
+
 ## Inputs and Settings
 
 **Current Canopy-App Input:** Typical 1D or 2D (time=1,lat,lon) gridded atmospheric model input variables in 1st layer above canopy.  Some 3D inputs are supported (see `var3d_opt` in [Table 3](#table-3-current-user-namelist-options) and associated options).
@@ -152,14 +202,21 @@ The Canopy-App input data in [Table 2](#table-2-canopy-app-required-input-variab
 | `shtfl`                          | Instantaneous sensible heat flux at surface (W/m2) | UFS NOAA/GFSv16                             |
 | `tmpsfc`                         | Surface temperature (K)                     | UFS NOAA/GFSv16                                    |
 | `tmp2m`                          | 2-meter temperature (K)                     | UFS NOAA/GFSv16                                    |
+| `tmp_hyblev1`                    | 1st hybrid model layer temperature (K)      | UFS NOAA/GFSv16                                    |
 | `spfh2m`                         | 2-meter specific humidity (kg/kg)           | UFS NOAA/GFSv16                                    |
 | `hpbl`                           | Height of the planetary boundary layer (m)  | UFS NOAA/GFSv16                                    |
 | `prate_ave`                      | Average mass precipitation rate (kg m-2 s-1) | UFS NOAA/GFSv16                                   |
+| `snowc_ave`                      | Average percent snow cover (%)               | UFS NOAA/GFSv16                                   |
+| `icec`                           | Average fraction ice cover (dimensionless)   | UFS NOAA/GFSv16                                   |
 | `soilw1`                         | Volumetric soil moisture in layer 1 (m3 m-3) | UFS NOAA/GFSv16                                   |
 | `soilw2`                         | Volumetric soil moisture in layer 2 (m3 m-3) | UFS NOAA/GFSv16                                   |
 | `soilw3`                         | Volumetric soil moisture in layer 3 (m3 m-3) | UFS NOAA/GFSv16                                   |
 | `soilw4`                         | Volumetric soil moisture in layer 4 (m3 m-3) | UFS NOAA/GFSv16                                   |
-| `wilt`                           | Wilting point (proportion)                  | UFS NOAA/GFSv16                                    |
+| `soilt1`                         | Soil temperature in layer 1 (K)              | UFS NOAA/GFSv16                                   |
+| `soilt2`                         | Soil temperature in layer 2 (K)              | UFS NOAA/GFSv16                                   |
+| `soilt3`                         | Soil temperature in layer 3 (K)              | UFS NOAA/GFSv16                                   |
+| `soilt4`                         | Soil temperature in layer 4 (K)              | UFS NOAA/GFSv16                                   |
+| `wilt`                           | Wilting point (proportion)                   | UFS NOAA/GFSv16                                    |
 | **External Canopy Variables**    | **Variable Description and Units**          | **Data Source/Reference (if necessary)**           |
 | `ch`                             | Canopy height (m)                    | Globally extended GEDI data. Data Period=2020. Data frequency=Annual. ([Lang et al., 2023](https://doi.org/10.1038/s41559-023-02206-6)) |
 | `clu`                            | Canopy clumping index (dimensionless)       | GriddingMachine/MODIS. Data Period=2001-2017 Climatology. Data frequency=Monthly. ([Wei et al., 2019](https://doi.org/10.1016/j.rse.2019.111296)). Extended globally for high latitudes using methods described [here](https://gmuedu-my.sharepoint.com/:w:/g/personal/whung_gmu_edu/EdglXmW2kzBDtDj1xV0alGcB1Yo2I8hzdyWGVGB2YOTfgw). |
@@ -184,7 +241,7 @@ https://noaa-oar-arl-nacc-pds.s3.amazonaws.com/inputs/
 
 Hourly gridded GFSv16 data is available from March 23, 2021 - Current Day and is supplemented by calculated and canopy parameters shown in Table 2.
 
-**Global 13-km global canopy files for 2022 are available on [AWS](https://registry.opendata.aws/noaa-oar-arl-nacc-pds/):**
+**Global 13-km global canopy files (based on 2020 satellite data) combined with 2022 GFS meteorology are available on [AWS](https://registry.opendata.aws/noaa-oar-arl-nacc-pds/):**
 
 ```
 https://noaa-oar-arl-nacc-pds.s3.amazonaws.com/inputs/geo-files/
@@ -241,20 +298,28 @@ Otherwise, please contact Patrick.C.Campbell@noaa.gov for other GFSv16 data peri
 | `var3d_opt`     | integer for selecting to use 3D variable in NetCDF file (e.g., 'PAVD') or to read supplementary canopy text file inputs (`file_canvars`).  (= `0`, default, off) or (= `1`, on). `file_canvars` read only when `infmt_opt` = 1 and `var3d_opt` = 1.  This is used with the number of levels defined by `var3d_set` below |
 | `var3d_set`     | integer for selecting number of 3D input levels, only used when setting `var3d_opt= `1`, default = 14 (Note:  For input text file the max current levels can only be 14, please input according to example data)  |
 |                 | **Options to use observed PAVD profiles and latitude threshold                 |
-| `pavd_opt`      | integer for choosing to use GEDI 3D input PAVD profiles instead of prescribed plant distribution functions (= `0`, default, off) or (= `1`, on);  Note: To use this option, must set `var3d_set= `1`, and the 3D pavd variable must be available in the input NetCDF file (i.e., `file_vars`) or in new auxilliary 3D PAVD text file  |
+| `pavd_opt`      | integer for choosing to use GEDI 3D input PAVD profiles instead of prescribed plant distribution functions (= `0`, default, off) or (= `1`, on);  Note: To use this option, must set `var3d_opt= `1`, and the 3D pavd variable must be available in the input NetCDF file (i.e., `file_vars`) or in new auxilliary 3D PAVD text file  |
 | `pavd_set`      | real value for +/- latitude threshold within to use observed GEDI 3D PAVD profiles instead of prescribed plant distribution functions.  Used only if `pavd_opt=1`.  Default  = 52.0 degrees latitude.   |
 |                 | **Canopy model vertical layers**                                                   |
 | `modlays`       | number of model (below and above canopy) layers. Strongly recommend adjusting this in accordance with `modres` option below to maintain canopy model column extension above tallest canopies in simulation domain (e.g.,for a 50 meter column simulation, a user could use 1000 modlays @ 0.05 m resolution,  100 modlays @ 0.5 m resolution, 50 modlays @ 1.0 m resolution, etc.                                     |
 | `modres`        | above and below canopy model vertical resolution (m)                               |
 |                 | **Contiguous canopy model thresholds**                                             |
-| `lai_thresh`    | user-set real value of LAI threshold for contiguous canopy (m2/m2)                 |
-| `cf_thresh`     | user-set real value of canopy fraction threshold for contiguous canopy             |
-| `ch_thresh`     | user-set real value of canopy height threshold for contiguous canopy (m)          |
+| `lai_thresh`    | user-set real value of LAI threshold for contiguous canopy (m2/m2).  Note:  Only applies for valid vegetated land use types (forests,ssg, crops, wetlands)                 |
+| `cf_thresh`     | user-set real value of canopy fraction threshold for contiguous canopy. Note:  Only applies for valid vegetated land use types (forests,ssg, crops, wetlands)             |
+| `ch_thresh`     | user-set real value of canopy height threshold for contiguous canopy (m). Note:  Only applies for valid vegetated land use types (forests,ssg, crops, wetlands)          |
 |                 | **Canopy crop and shrub/savanna/grass extension options**                          |
-| `ssg_opt`       | integer for using either input data  (= `0`, default) or user set shrub/savanna/grass (SSG) vegetation type heights from namelist (= `1`).  Currently, GEDI FCH input data may not provide canopy heights for very low-lying vegetation such as SSG, and thus FCH=0.  This is important for options such as biogenic emissions, as this would then not have any emissions for these areas.  Warning: use of ssg_opt=1 will overide potential observations of FCH from GEDI for low-lying SSG (at higher spatial resolution) and cover larger areas of lower resolution vegtype data indicating SSG.  |
-| `ssg_set`       | user-set real value of constant SSG vegetation type heights (m) (only used if `ssg_opt=1`).  We recommend setting this to a low value, e.g., ssg_set=0.5 or 1.0 (meters) when `ssg_opt=1` |
-| `crop_opt`      | integer for using either input data  (= `0`, default) or user set crop vegetation type heights from namelist (= `1`).  Currently, GEDI FCH input data only provides canopy heights for forests and not crops.  Warning: use of crop_opt=1 will overide typically higher resolution input data (e.g., GEDI) forest canopy heights where the lower resolution vegtype data indicates crops  |
-| `crop_set`      | user-set real value of constant crop vegetation type heights (m) (only used if `crop_opt=1`) |
+| `can_opt`       | integer for using either input data  (= `0`, default) or user set canopy vegetation type ch, cf, and lai from namelist (= `1`).  Currently, satellite may have missing ch, cf, or lai for lower forests/tundra and thus FCH=0.  This is important for options such as biogenic emissions, dry deposition, etc, as this would then not have any emissions/drydep for these areas.  Note: use of can_opt=1 will only use `can_chset`, `can_cfset`, or `can_laiset` values if observations are found to be missing, i.e., <=0.0.|
+| `can_chset`     | user-set real value of constant canopy vegetation type heights (m) (only used if `can_opt=1`). |
+| `can_cfset`     | user-set real value of constant canopy vegetation fraction (only used if `can_opt=1`). |
+| `can_laiset`     | user-set real value of constant canopy LAI (only used if `can_opt=1`). |
+| `ssg_opt`       | integer for using either input data  (= `0`, default) or user set shrub/savanna/grass (SSG) vegetation type ch, cf, and lai from namelist (= `1`).  Currently, satellite input data may not provide canopy heights, fractions, or lai for very low-lying vegetation such as SSG types, and thus FCH=0 for example.  This is important for options such as biogenic emissions, dry deposition, etc. as this would then not have any emissions/drydep for these areas.  Note: use of ssg_opt=1 will only use `ssg_chset`, `ssg_cfset`, or `ssg_laiset` values if observations are found to be missing, i.e., <=0.0.| |
+| `ssg_chset`     | user-set real value of constant SSG vegetation type heights (m) (only used if `ssg_opt=1`).  We recommend setting this to a low value, e.g., ssg_set=0.5 or 1.0 (meters) when `ssg_opt=1` |
+| `ssg_cfset`     | user-set real value of constant SSG vegetation fraction (only used if `ssg_opt=1`). |
+| `ssg_laiset`     | user-set real value of constant SSG LAI (only used if `ssg_opt=1`). |
+| `crop_opt`      | integer for using either input data  (= `0`, default) or user set crop vegetation type ch, cf, and lai from namelist (= `1`).  Note: use of crop_opt=1 will only use `crop_chset`, `crop_cfset`, or `crop_laiset` values if observations are found to be missing, i.e., <=0.0.|  |
+| `crop_chset`    | user-set real value of constant crop vegetation type heights (m) (only used if `crop_opt=1`) |
+| `crop_cfset`    | user-set real value of constant crop vegetation fraction (only used if `crop_opt=1`) |
+| `crop_laiset`    | user-set real value of constant crop LAI (only used if `crop_opt=1`) |
 |                 | **Canopy physics and wind-specific options**                                       |
 | `ifcanwind`     | logical canopy wind option (default: `.FALSE.`)                                    |
 | `href_opt`      | integer for using `href_set` in namelist (= `0`, default) or array from file (= `1`) |
@@ -298,6 +363,16 @@ Otherwise, please contact Patrick.C.Campbell@noaa.gov for other GFSv16 data peri
 | `ht_opt`       | user-set options for applying a daily high temperature stress factor for biogenic emissions using daily maximum 2-meter input temperature (= `0`).  This is based on MEGAN3 and it is recommended that this option is only used when turning the historical option on (i.e., `hist_opt=1`) and running longer than 1-day simulations to obtain the daily max.   To turn off ht stress factor set `ht_opt=1` (set as default, Off)  |
 | `lt_opt`       | user-set options for applying a daily low temperature stress factor for biogenic emissions using daily minimum 2-meter input temperature (= `0`).  This is based on MEGAN3 and it is recommended that this option is only used when turning the historical option on (i.e., `hist_opt=1`) and running longer than 1-day simulations to obtain the daily min.   To turn off lt stress factor set `lt_opt=1` (set as default, Off) |
 | `hw_opt`       | user-set options for applying a daily high wind speed stress factor for biogenic emissions using daily maximum 10-meter input wind speed (= `0`).  This is based on MEGAN3 and it is recommended that this option is only used when turning the historical option on (i.e., `hist_opt=1`) and running longer than 1-day simulations to obtain the daily max.   To turn off hw stress factor set `hw_opt=1` (set as default, Off) |
+|                 | **Canopy gas dry deposition-specific options**                                     |
+| `ifcanddepgas`  | logical canopy gas dry deposition option (default: `.FALSE.`)                      |
+| `ddepspecgas_opt`   | user set option to select species for NetCDF gas dry deposition output (`0`: all species, or e.g., `1-31`: for one species selected according to ID number - Table 2 and the specific gas chemical mechanism (e.g., RACM2) (default: 0; ID number for single species selection only used if `infmt_opt=0`).  Note:  The single number species option should match that desired species from select chemical mechanism option (`chemmechgas_opt`), and not be greater than the total number of species within that gas chemical mechanism option used (`chemmechgas_tot`).         |
+| `chemmechgas_opt`   | user set option to select gas chemical mechanism and gas species mapping including transported species.  (`0`: Default = RACM2 mechanism; Only option currently).
+| `chemmechgas_tot`   | user set option to define total number of gas species in select gas chemical mechanism (`chemmechgas_opt`) including transported species.  (`31`: Default = RACM2 mechanism; Only option currently).
+| `hyblev1`   | user set real value of approximate height AGL of input 1st hybrid model layer associated with input `tmp_hyblev1` ( Default = 20 meters associated with GFSv16; Best used to approximate constant ambient temperature lapse rate with `tmp2m`, particularly in global appliations with areas of extreme soil or skin/surface temperature gradients).
+| `snowc_set`      | Set default value for threshold percent snow cover, above which grid/point at ground is treated as dominant covered by snow  (Default = 50%).  Note: This applies at grids/points both beneath the vegetative canopies at ground as well as grids/points outside of contiguous canopies, e.g., barren lands, snow/ice, urban, and water) |
+| `icec_set`      | Set default value for threshold percent ice cover, above which grid/point at ground or water is treated as dominant covered by ice  (Default = 50%).  Note: This applies at grids/points both beneath the vegetative canopies at ground as well as grids/points outside of contiguous canopies, e.g., barren lands, snow/ice, urban, and water) |
+| `gamma_set`      | Set default reaction probability for gas dry deposition for respective building surface (default = 5.0D-5; Based on average of range in gamma across different building surfaces, e.g., 10-8 for glass and metal to 10-4 for activated carbon and brick; Gao and Shen (2018); https://doi.org/10.1016/j.buildenv.2018.02.046). Note: This only applies across dominant urban grids/points. |
+| `Ramin_set`      | Set default minimum aerodynamic resistance for gas dry deposition (Default 10 s/m) |
 
 
 **\*\*** If `modres` >> `flameh` then some error in WAF calculation will be incurred.  Suggestion is to use relative fine `modres` (at least <= 0.5 m) compared to average flame heights (e.g., ~ 1.0 m) if WAF is required.
@@ -334,7 +409,11 @@ Otherwise, please contact Patrick.C.Campbell@noaa.gov for other GFSv16 data peri
 
 - Massman, W. J., J.M. Forthofer, and M.A. Finney. (2017). An improved canopy wind model for predicting wind adjustment factors and wildland fire behavior. Canadian Journal of Forest Research. 47(5): 594-603. https://doi.org/10.1139/cjfr-2016-0354
 
+- Saylor, R. D.: The Atmospheric Chemistry and Canopy Exchange Simulation System (ACCESS): model description and application to a temperate deciduous forest canopy, Atmos. Chem. Phys., 13, 693–715, https://doi.org/10.5194/acp-13-693-2013, 2013.
+
 - Silva, S. J., Heald, C. L., and Guenther, A. B.: Development of a reduced-complexity plant canopy physics surrogate model for use in chemical transport models: a case study with GEOS-Chem v12.3.0, Geosci. Model Dev., 13, 2569–2585, https://doi.org/10.5194/gmd-13-2569-2020, 2020.
+
+- Zhang, L., Brook, J. R., and Vet, R.: A revised parameterization for gaseous dry deposition in air-quality models, Atmos. Chem. Phys., 3, 2067–2082, https://doi.org/10.5194/acp-3-2067-2003, 2003.
 
 ## Development
 
