@@ -80,7 +80,7 @@ contains
                 rm(i)      = rml(hstarl, f01)                              !leaf mesophyll resistance (s/cm)
                 rnum = rc(i) * (rs(i) + rm(i))
                 rden = rc(i) + 2.0_rk * (rs(i) + rm(i))
-                rlx   = rb(i) + (rnum/rden)
+                rlx   = rb(i) + (rnum/rden) + RA                           !surface+boundary+aerodynamic resistances (s/cm)
                 vdlx  = 1.0_rk/rlx
                 dep_out(i) = vdlx                                          !calculate deposition velocity (cm/s)
             else
