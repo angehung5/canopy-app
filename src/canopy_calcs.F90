@@ -32,7 +32,10 @@ SUBROUTINE canopy_calcs(nn)
     !Local variables
     integer i,j,k,loc
     ! LAI variables for Leaf Age factor calculations
-    REAL(rk) :: pastlai             !Past LAI [cm2/cm2]
+    INTEGER  :: int_nlaic           !Int number of LAI timesteps elapsed in the current model timestep
+    INTEGER,  save :: int_nlaip     !Int number of LAI timesteps elapsed in the past model timestep
+    REAL(rk) :: nlaic, nlaip        !Number of LAI timesteps elapsed in past and current model timesteps
+    REAL(rk), save :: pastlai       !Past LAI [cm2/cm2]
     REAL(rk), save :: currentlai    ! Current LAI [cm2/cm2]  (saved from one timestep to the next)
     REAL(rk) :: tsteplai            !Number of days between the past and current LAI
     !Historical Averaging variables for biogenics
@@ -373,24 +376,26 @@ SUBROUTINE canopy_calcs(nn)
 
 !.......user option to calculate in-canopy leafage influence and assigning LAI as per timestep
 
-
                             if (leafage_opt .eq. 0) then
-                                ! Initialize pastlai and currentlai based on current timestep
-                                if (nn .eq. 1) then
-                                    currentlai = lairef
-                                    pastlai = currentlai
-                                else
-                                    pastlai = currentlai
-                                    currentlai = lairef
-                                end if
-
                                 !!! Check if the lai_tstep is greater than time_intvl
                                 if (lai_tstep .ge. time_intvl) then
-                                    tsteplai = lai_tstep/86400.0_rk
+                                    tsteplai = lai_tstep/86400.0_rk  !convert lai_tstep to time step in # of days needed for bud break in leafage
+                                    nlaic = nn*time_intvl/lai_tstep  !calculate number of lai tsteps that have elapsed
+                                    int_nlaic = int(nlaic)
                                 else
                                     WRITE (*, *) "Error: Input LAI time step cannot be less than model time step...exiting!!!"
                                     CALL EXIT(1)
                                 endif
+                                ! Initialize pastlai and currentlai based on current timestep
+                                if (nn .eq. 1) then
+                                    currentlai = lairef
+                                    pastlai = currentlai
+                                else if (int_nlaic .gt. int_nlaip) then !only update with each new lai tstep
+                                    pastlai = currentlai
+                                    currentlai = lairef
+                                endif
+                                nlaip = nlaic !set value to compare in next model time step
+                                int_nlaip = int(nlaip)
                             end if !leafage_opt = 0 end
 
 !.......user option to calculate historical leaf temperature and PAR for past 24-hours and 240-hours rolling average per timestep
@@ -2783,23 +2788,27 @@ SUBROUTINE canopy_calcs(nn)
                         end if
 
 !.......user option to calculate in-canopy leafage influence and assigning LAI as per timestep
-                        if (leafage_opt .eq. 0) then
-                            ! Initialize pastlai and currentlai based on current timestep
-                            if (nn .eq. 1) then
-                                currentlai = lairef
-                                pastlai = currentlai
-                            else
-                                pastlai = currentlai
-                                currentlai = lairef
-                            end if
 
+                        if (leafage_opt .eq. 0) then
                             !!! Check if the lai_tstep is greater than time_intvl
                             if (lai_tstep .ge. time_intvl) then
-                                tsteplai = lai_tstep/86400.0_rk
+                                tsteplai = lai_tstep/86400.0_rk  !convert lai_tstep to time step in # of days needed for bud break in leafage
+                                nlaic = nn*time_intvl/lai_tstep  !calculate number of lai tsteps that have elapsed
+                                int_nlaic = int(nlaic)
                             else
                                 WRITE (*, *) "Error: Input LAI time step cannot be less than model time step...exiting!!!"
                                 CALL EXIT(1)
                             endif
+                            ! Initialize pastlai and currentlai based on current timestep
+                            if (nn .eq. 1) then
+                                currentlai = lairef
+                                pastlai = currentlai
+                            else if (int_nlaic .gt. int_nlaip) then !only update with each new lai tstep
+                                pastlai = currentlai
+                                currentlai = lairef
+                            endif
+                            nlaip = nlaic !set value to compare in next model time step
+                            int_nlaip = int(nlaip)
                         end if !leafage_opt = 0 end
 
 !.......user option to calculate historical leaf temperature and PAR for past 24-hours and 240-hours rolling average per timestep
