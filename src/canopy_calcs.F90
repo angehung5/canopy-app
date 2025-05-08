@@ -933,7 +933,7 @@ SUBROUTINE canopy_calcs(nn)
                                     if (biospec_opt == 0 .or. biospec_opt == 18) then
                                         emi_svoc_3d(i,j,:) = 0.0_rk
                                     end if
-                                    if (biospec_opt == 0 .or. biospec_opt == 1) then
+                                    if (biospec_opt == 0 .or. biospec_opt == 19) then
                                         emi_ovoc_3d(i,j,:) = 0.0_rk
                                     end if
                                 end if
