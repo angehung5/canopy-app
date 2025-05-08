@@ -878,6 +878,26 @@ SUBROUTINE canopy_calcs(nn)
                                             daily_maxws10m_2d(i,j), &
                                             modlays, 19, emi_ovoc_3d(i,j,:))
                                     end if
+                                else
+                                    emi_isop_3d(i,j,:) = 0.0_rk
+                                    emi_myrc_3d(i,j,:) = 0.0_rk
+                                    emi_sabi_3d(i,j,:) = 0.0_rk
+                                    emi_limo_3d(i,j,:) = 0.0_rk
+                                    emi_care_3d(i,j,:) = 0.0_rk
+                                    emi_ocim_3d(i,j,:) = 0.0_rk
+                                    emi_bpin_3d(i,j,:) = 0.0_rk
+                                    emi_apin_3d(i,j,:) = 0.0_rk
+                                    emi_mono_3d(i,j,:) = 0.0_rk
+                                    emi_farn_3d(i,j,:) = 0.0_rk
+                                    emi_cary_3d(i,j,:) = 0.0_rk
+                                    emi_sesq_3d(i,j,:) = 0.0_rk
+                                    emi_mbol_3d(i,j,:) = 0.0_rk
+                                    emi_meth_3d(i,j,:) = 0.0_rk
+                                    emi_acet_3d(i,j,:) = 0.0_rk
+                                    emi_co_3d(i,j,:) = 0.0_rk
+                                    emi_bvoc_3d(i,j,:) = 0.0_rk
+                                    emi_svoc_3d(i,j,:) = 0.0_rk
+                                    emi_ovoc_3d(i,j,:) = 0.0_rk
                                 end if
                             end if
 
@@ -1439,6 +1459,26 @@ SUBROUTINE canopy_calcs(nn)
                                 end if
                             end if
 
+                        else
+                            emi_isop_3d(i,j,:) = 0.0_rk
+                            emi_myrc_3d(i,j,:) = 0.0_rk
+                            emi_sabi_3d(i,j,:) = 0.0_rk
+                            emi_limo_3d(i,j,:) = 0.0_rk
+                            emi_care_3d(i,j,:) = 0.0_rk
+                            emi_ocim_3d(i,j,:) = 0.0_rk
+                            emi_bpin_3d(i,j,:) = 0.0_rk
+                            emi_apin_3d(i,j,:) = 0.0_rk
+                            emi_mono_3d(i,j,:) = 0.0_rk
+                            emi_farn_3d(i,j,:) = 0.0_rk
+                            emi_cary_3d(i,j,:) = 0.0_rk
+                            emi_sesq_3d(i,j,:) = 0.0_rk
+                            emi_mbol_3d(i,j,:) = 0.0_rk
+                            emi_meth_3d(i,j,:) = 0.0_rk
+                            emi_acet_3d(i,j,:) = 0.0_rk
+                            emi_co_3d(i,j,:) = 0.0_rk
+                            emi_bvoc_3d(i,j,:) = 0.0_rk
+                            emi_svoc_3d(i,j,:) = 0.0_rk
+                            emi_ovoc_3d(i,j,:) = 0.0_rk
                         end if !Contiguous Canopy
 
                     else if (vtyperef .eq. 15 .or. vtyperef .eq. 16 .or. vtyperef .eq. 20) then !Barren/Sparsely Vegetated  or
@@ -3290,6 +3330,26 @@ SUBROUTINE canopy_calcs(nn)
                                         daily_maxws10m(loc), &
                                         modlays, 19, emi_ovoc(loc,:))
                                 end if
+                            else
+                                emi_isop(loc,:) = 0.0_rk
+                                emi_myrc(loc,:) = 0.0_rk
+                                emi_sabi(loc,:) = 0.0_rk
+                                emi_limo(loc,:) = 0.0_rk
+                                emi_care(loc,:) = 0.0_rk
+                                emi_ocim(loc,:) = 0.0_rk
+                                emi_bpin(loc,:) = 0.0_rk
+                                emi_apin(loc,:) = 0.0_rk
+                                emi_mono(loc,:) = 0.0_rk
+                                emi_farn(loc,:) = 0.0_rk
+                                emi_cary(loc,:) = 0.0_rk
+                                emi_sesq(loc,:) = 0.0_rk
+                                emi_mbol(loc,:) = 0.0_rk
+                                emi_meth(loc,:) = 0.0_rk
+                                emi_acet(loc,:) = 0.0_rk
+                                emi_co(loc,:) = 0.0_rk
+                                emi_bvoc(loc,:) = 0.0_rk
+                                emi_svoc(loc,:) = 0.0_rk
+                                emi_ovoc(loc,:) = 0.0_rk
                             end if
                         end if
 
@@ -3850,6 +3910,26 @@ SUBROUTINE canopy_calcs(nn)
                                 call exit(2)
                             end if
                         end if
+                    else
+                        emi_isop(loc,:) = 0.0_rk
+                        emi_myrc(loc,:) = 0.0_rk
+                        emi_sabi(loc,:) = 0.0_rk
+                        emi_limo(loc,:) = 0.0_rk
+                        emi_care(loc,:) = 0.0_rk
+                        emi_ocim(loc,:) = 0.0_rk
+                        emi_bpin(loc,:) = 0.0_rk
+                        emi_apin(loc,:) = 0.0_rk
+                        emi_mono(loc,:) = 0.0_rk
+                        emi_farn(loc,:) = 0.0_rk
+                        emi_cary(loc,:) = 0.0_rk
+                        emi_sesq(loc,:) = 0.0_rk
+                        emi_mbol(loc,:) = 0.0_rk
+                        emi_meth(loc,:) = 0.0_rk
+                        emi_acet(loc,:) = 0.0_rk
+                        emi_co(loc,:) = 0.0_rk
+                        emi_bvoc(loc,:) = 0.0_rk
+                        emi_svoc(loc,:) = 0.0_rk
+                        emi_ovoc(loc,:) = 0.0_rk
                     end if !Contiguous Canopy
 
                 else if (vtyperef .eq. 15 .or. vtyperef .eq. 16 .or. vtyperef .eq. 20) then !Barren/Sparsely Vegetated  or Barren
