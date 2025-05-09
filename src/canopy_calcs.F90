@@ -878,6 +878,64 @@ SUBROUTINE canopy_calcs(nn)
                                             daily_maxws10m_2d(i,j), &
                                             modlays, 19, emi_ovoc_3d(i,j,:))
                                     end if
+                                else
+                                    if (biospec_opt == 0 .or. biospec_opt == 1) then
+                                        emi_isop_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 2) then
+                                        emi_myrc_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 3) then
+                                        emi_sabi_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 4) then
+                                        emi_limo_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 5) then
+                                        emi_care_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 6) then
+                                        emi_ocim_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 7) then
+                                        emi_bpin_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 8) then
+                                        emi_apin_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 9) then
+                                        emi_mono_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 10) then
+                                        emi_farn_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 11) then
+                                        emi_cary_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 12) then
+                                        emi_sesq_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 13) then
+                                        emi_mbol_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 14) then
+                                        emi_meth_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 15) then
+                                        emi_acet_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 16) then
+                                        emi_co_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 17) then
+                                        emi_bvoc_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 18) then
+                                        emi_svoc_3d(i,j,:) = 0.0_rk
+                                    end if
+                                    if (biospec_opt == 0 .or. biospec_opt == 19) then
+                                        emi_ovoc_3d(i,j,:) = 0.0_rk
+                                    end if
                                 end if
                             end if
 
@@ -1438,7 +1496,64 @@ SUBROUTINE canopy_calcs(nn)
                                     call exit(2)
                                 end if
                             end if
-
+                        else
+                            if (biospec_opt == 0 .or. biospec_opt == 1) then
+                                emi_isop_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 2) then
+                                emi_myrc_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 3) then
+                                emi_sabi_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 4) then
+                                emi_limo_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 5) then
+                                emi_care_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 6) then
+                                emi_ocim_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 7) then
+                                emi_bpin_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 8) then
+                                emi_apin_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 9) then
+                                emi_mono_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 10) then
+                                emi_farn_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 11) then
+                                emi_cary_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 12) then
+                                emi_sesq_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 13) then
+                                emi_mbol_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 14) then
+                                emi_meth_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 15) then
+                                emi_acet_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 16) then
+                                emi_co_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 17) then
+                                emi_bvoc_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 18) then
+                                emi_svoc_3d(i,j,:) = 0.0_rk
+                            end if
+                            if (biospec_opt == 0 .or. biospec_opt == 19) then
+                                emi_ovoc_3d(i,j,:) = 0.0_rk
+                            end if
                         end if !Contiguous Canopy
 
                     else if (vtyperef .eq. 15 .or. vtyperef .eq. 16 .or. vtyperef .eq. 20) then !Barren/Sparsely Vegetated  or
@@ -3290,6 +3405,64 @@ SUBROUTINE canopy_calcs(nn)
                                         daily_maxws10m(loc), &
                                         modlays, 19, emi_ovoc(loc,:))
                                 end if
+                            else
+                                if (biospec_opt == 0 .or. biospec_opt == 1) then
+                                    emi_isop(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 2) then
+                                    emi_myrc(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 3) then
+                                    emi_sabi(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 4) then
+                                    emi_limo(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 5) then
+                                    emi_care(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 6) then
+                                    emi_ocim(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 7) then
+                                    emi_bpin(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 8) then
+                                    emi_apin(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 9) then
+                                    emi_mono(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 10) then
+                                    emi_farn(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 11) then
+                                    emi_cary(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 12) then
+                                    emi_sesq(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 13) then
+                                    emi_mbol(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 14) then
+                                    emi_meth(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 15) then
+                                    emi_acet(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 16) then
+                                    emi_co(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 17) then
+                                    emi_bvoc(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 18) then
+                                    emi_svoc(loc,:) = 0.0_rk
+                                end if
+                                if (biospec_opt == 0 .or. biospec_opt == 19) then
+                                    emi_ovoc(loc,:) = 0.0_rk
+                                end if
                             end if
                         end if
 
@@ -3849,6 +4022,64 @@ SUBROUTINE canopy_calcs(nn)
                                 write(*,*)  'Set IfCanwind to True to use IfCanDDepGas'
                                 call exit(2)
                             end if
+                        end if
+                    else
+                        if (biospec_opt == 0 .or. biospec_opt == 1) then
+                            emi_isop(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 2) then
+                            emi_myrc(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 3) then
+                            emi_sabi(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 4) then
+                            emi_limo(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 5) then
+                            emi_care(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 6) then
+                            emi_ocim(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 7) then
+                            emi_bpin(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 8) then
+                            emi_apin(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 9) then
+                            emi_mono(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 10) then
+                            emi_farn(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 11) then
+                            emi_cary(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 12) then
+                            emi_sesq(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 13) then
+                            emi_mbol(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 14) then
+                            emi_meth(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 15) then
+                            emi_acet(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 16) then
+                            emi_co(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 17) then
+                            emi_bvoc(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 18) then
+                            emi_svoc(loc,:) = 0.0_rk
+                        end if
+                        if (biospec_opt == 0 .or. biospec_opt == 19) then
+                            emi_ovoc(loc,:) = 0.0_rk
                         end if
                     end if !Contiguous Canopy
 
