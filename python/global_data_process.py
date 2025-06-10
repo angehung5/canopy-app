@@ -127,13 +127,13 @@ def find_canopy_data(year):
     flist = {
         "lai": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_leaf_area_index."
         + year
-        + ".0.01.nc", \
-        "clu": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_clumping_index.2001_2017.0.01.nc", \
+        + ".0.01.nc",
+        "clu": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_clumping_index.2001_2017.0.01.nc",
         "canfrac": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_green_vegetation_fraction."
         + year
-        + ".0.01.nc", \
-        "ch": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_height.2020.0.01.nc", \
-        "pavd": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_plant_area_volume_density.2019_2023.0.01.nc", \
+        + ".0.01.nc",
+        "ch": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_height.2020.0.01.nc",
+        "pavd": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_plant_area_volume_density.2019_2023.0.01.nc",
         "ozone_w126": "/groups/NA22OAR/pcampbe8/gfsv16_ozone_w126/gfsv16_ozone_w126_042021-042024_v3.nc"
     }
     return flist
@@ -176,14 +176,14 @@ def read_user_canopy(filename, basefile, varname, month):
     if varname == "lai":
         DATA = (
             basefile["zc"]
-            .monet.remap_nearest(readin["canopy_leaf_area_index"][int(month)-1, :, :])
+            .monet.remap_nearest(readin["canopy_leaf_area_index"][int(month) - 1, :, :])
             .data
         )
         DATA[DATA < 0] = 0
     elif varname == "clu":
         DATA = (
             basefile["zc"]
-            .monet.remap_nearest(readin["canopy_clumping_index"][int(month)-1, :, :])
+            .monet.remap_nearest(readin["canopy_clumping_index"][int(month) - 1, :, :])
             .data
         )
         DATA[DATA < 0] = 0
@@ -191,18 +191,14 @@ def read_user_canopy(filename, basefile, varname, month):
         DATA = (
             basefile["zc"]
             .monet.remap_nearest(
-                readin["canopy_green_vegetation_fraction"][int(month)-1, :, :]
+                readin["canopy_green_vegetation_fraction"][int(month) - 1, :, :]
             )
             .data
         )
         DATA[DATA < 0] = 0
         DATA[DATA > 1] = 1
     elif varname == "ch":
-        DATA = (
-            basefile["zc"]
-            .monet.remap_nearest(readin["canopy_height"][0, :, :])
-            .data
-        )
+        DATA = basefile["zc"].monet.remap_nearest(readin["canopy_height"][0, :, :]).data
         DATA[DATA < 0] = 0
     elif varname == "pavd":
         nlev = len(readin.layer_top.data)
@@ -399,7 +395,7 @@ for inputtime in timelist:
             os.path.isfile(f_can["canfrac"]),
             os.path.isfile(f_can["ch"]),
             os.path.isfile(f_can["pavd"]),
-            os.path.isfile(f_can["ozone_w126"])
+            os.path.isfile(f_can["ozone_w126"]),
         ]
         if False in checklist:
             print("---- Invalid user specified canopy data found:")
