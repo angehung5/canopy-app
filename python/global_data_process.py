@@ -124,12 +124,18 @@ def write_varatt(var, attname, att):
 
 
 def find_canopy_data(year):
-    flist = {"lai": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_leaf_area_index."+year+".0.01.nc", \
-             "clu": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_clumping_index.2001_2017.0.01.nc", \
-             "canfrac": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_green_vegetation_fraction."+year+".0.01.nc", \
-             "ch": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_height.2020.0.01.nc", \
-             "pavd": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_plant_area_volume_density.2019_2023.0.01.nc", \
-             "ozone_w126": "/groups/NA22OAR/pcampbe8/gfsv16_ozone_w126/gfsv16_ozone_w126_042021-042024_v3.nc"}
+    flist = {
+        "lai": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_leaf_area_index."
+        + year
+        + ".0.01.nc", \
+        "clu": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_clumping_index.2001_2017.0.01.nc", \
+        "canfrac": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_green_vegetation_fraction."
+        + year
+        + ".0.01.nc", \
+        "ch": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_height.2020.0.01.nc", \
+        "pavd": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_plant_area_volume_density.2019_2023.0.01.nc", \
+        "ozone_w126": "/groups/NA22OAR/pcampbe8/gfsv16_ozone_w126/gfsv16_ozone_w126_042021-042024_v3.nc"
+    }
     return flist
 
 
@@ -158,34 +164,56 @@ def read_gfs_climatology(filename, basefile, varname):
 
 def read_user_canopy(filename, basefile, varname, month):
     readin = xr.open_dataset(filename)
-    readin = readin.rename({"jdim":"y", "idim":"x", "jdim_p1":"y_p1"})
+    readin = readin.rename({"jdim": "y", "idim": "x", "jdim_p1": "y_p1"})
 
     grid_xt, grid_yt = np.meshgrid(readin["lon"].data, readin["lat"].data)
     yt = xr.DataArray(grid_yt, dims=["y", "x"], name="latitude")
     xt = xr.DataArray(grid_xt, dims=["y", "x"], name="longitude")
-    readin["latitude"]  = yt
+    readin["latitude"] = yt
     readin["longitude"] = xt
     readin = readin.set_coords(["latitude", "longitude"])
 
     if varname == "lai":
-        DATA = basefile["zc"].monet.remap_nearest(readin["canopy_leaf_area_index"][int(month)-1, :, :]).data
+        DATA = (
+            basefile["zc"]
+            .monet.remap_nearest(readin["canopy_leaf_area_index"][int(month)-1, :, :])
+            .data
+        )
         DATA[DATA < 0] = 0
     elif varname == "clu":
-        DATA = basefile["zc"].monet.remap_nearest(readin["canopy_clumping_index"][int(month)-1, :, :]).data
+        DATA = (
+            basefile["zc"]
+            .monet.remap_nearest(readin["canopy_clumping_index"][int(month)-1, :, :])
+            .data
+        )
         DATA[DATA < 0] = 0
     elif varname == "canfrac":
-        DATA = basefile["zc"].monet.remap_nearest(readin["canopy_green_vegetation_fraction"][int(month)-1, :, :]).data
+        DATA = (
+            basefile["zc"]
+            .monet.remap_nearest(
+                readin["canopy_green_vegetation_fraction"][int(month)-1, :, :]
+            )
+            .data
+        )
         DATA[DATA < 0] = 0
         DATA[DATA > 1] = 1
     elif varname == "ch":
-        DATA = basefile["zc"].monet.remap_nearest(readin["canopy_height"][0, :, :]).data
+        DATA = (
+            basefile["zc"]
+            .monet.remap_nearest(readin["canopy_height"][0, :, :])
+            .data
+        )
         DATA[DATA < 0] = 0
     elif varname == "pavd":
         nlev = len(readin.layer_top.data)
         DATA = np.empty([nlev, basefile.zc.data.shape[1], basefile.zc.data.shape[2]])
         for ll in np.arange(nlev):
             DATA[ll, :, :] = (
-                basefile["zc"].monet.remap_nearest(readin["canopy_plant_area_volume_density"][0, ll, :, :]).data
+                basefile["zc"]
+                .monet.remap_nearest(
+                    readin["canopy_plant_area_volume_density"][0, ll, :, :]
+                )
+                .data
             )
         DATA[DATA < 0] = 0
     readin.close()
@@ -194,12 +222,12 @@ def read_user_canopy(filename, basefile, varname, month):
 
 def read_user_ozone(filename, basefile):
     readin = xr.open_dataset(filename)
-    readin = readin.rename({"grid_yt":"y", "grid_xt":"x"})
+    readin = readin.rename({"grid_yt": "y", "grid_xt": "x"})
 
     grid_xt, grid_yt = np.meshgrid(readin["x"].data, readin["y"].data)
     yt = xr.DataArray(grid_yt, dims=["y", "x"], name="latitude")
     xt = xr.DataArray(grid_xt, dims=["y", "x"], name="longitude")
-    readin["latitude"]  = yt
+    readin["latitude"] = yt
     readin["longitude"] = xt
     readin = readin.set_coords(["latitude", "longitude"])
 
@@ -285,7 +313,16 @@ for inputtime in timelist:
 
     if can_src == 0:  # canopy climatology from exsample gfs flie
         f_can = (
-            path + "/gfs.canopy.t" + HH + "z." + "2022" + MM + DD + ".sfcf" + FH + ".global.nc"
+            path
+            + "/gfs.canopy.t"
+            + HH
+            + "z."
+            + "2022"
+            + MM
+            + DD
+            + ".sfcf"
+            + FH
+            + ".global.nc"
         )
     elif can_src == 1:  # user specified canopy data
         f_can = find_canopy_data(YY)
@@ -333,7 +370,14 @@ for inputtime in timelist:
                     "--no-check-certificate",
                     "--no-proxy",
                     "-O",
-                    path + "/gfs.canopy.t12z." + "2022" + MM + DD + ".sfcf" + FH + ".global.nc",
+                    path
+                    + "/gfs.canopy.t12z."
+                    + "2022"
+                    + MM
+                    + DD
+                    + ".sfcf"
+                    + FH
+                    + ".global.nc",
                     "https://noaa-oar-arl-nacc-pds.s3.amazonaws.com/inputs/geo-files/"
                     + "gfs.canopy.t12z."
                     + "2022"
@@ -349,8 +393,14 @@ for inputtime in timelist:
                 print("---- No available canopy data. Terminated!")
                 exit()
     elif can_src == 1:  # user specified
-        checklist = [os.path.isfile(f_can["lai"]), os.path.isfile(f_can["clu"]), os.path.isfile(f_can["canfrac"]), \
-                    os.path.isfile(f_can["ch"]), os.path.isfile(f_can["pavd"]), os.path.isfile(f_can["ozone_w126"])]
+        checklist = [
+            os.path.isfile(f_can["lai"]),
+            os.path.isfile(f_can["clu"]),
+            os.path.isfile(f_can["canfrac"]),
+            os.path.isfile(f_can["ch"]),
+            os.path.isfile(f_can["pavd"]),
+            os.path.isfile(f_can["ozone_w126"])
+        ]
         if False in checklist:
             print("---- Invalid user specified canopy data found:")
             print("lai   clu   canfrac   ch   pavd   ozone_w126")
