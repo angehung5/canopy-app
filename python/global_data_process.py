@@ -134,7 +134,7 @@ def find_canopy_data(year):
         + ".0.01.nc",
         "ch": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_height.2020.0.01.nc",
         "pavd": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_plant_area_volume_density.2019_2023.0.01.nc",
-        "ozone_w126": "/groups/NA22OAR/pcampbe8/gfsv16_ozone_w126/gfsv16_ozone_w126_042021-042024_v3.nc"
+        "ozone_w126": "/groups/NA22OAR/pcampbe8/gfsv16_ozone_w126/gfsv16_ozone_w126_042021-042024_v3.nc",
     }
     return flist
 
