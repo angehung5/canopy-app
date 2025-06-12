@@ -124,6 +124,12 @@ def write_varatt(var, attname, att):
 
 
 def find_canopy_data(year):
+    # GMU's global lai and canfrac are only available for 2020 - 2024.
+    # The closest year would be used for simulation time beyond the data period.
+    if int(year) < 2020:
+        year = "2020"
+    elif int(year) > 2024:
+        year = "2024"
     flist = {
         "lai": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_leaf_area_index."
         + year
