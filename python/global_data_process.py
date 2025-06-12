@@ -123,7 +123,7 @@ def write_varatt(var, attname, att):
 
 
 def find_user_canopy(year):
-    # Please specify the location of local user canopy data here. 
+    # Please specify the location of local user canopy data here.
     flist = {
         "lai": "/groups/ESS/whung/Alldata/Global_canopy/grid1km/canopy_leaf_area_index."
         + year
@@ -216,8 +216,8 @@ def read_aws_canopy(filename, basefile, varname, month):
 
 
 def read_user_canopy():
-    # Please specify the necessary processing of user canopy data here. 
-    # Recommanded data processes include but not limit to: data read in, unit conversion and gridding
+    # Please specify the necessary processing of user canopy data here.
+    # Recommanded data processes include but not limit to: data read in, unit conversion and gridding.
     return DATA
 
 
@@ -271,7 +271,16 @@ for inputtime in timelist:
         path + "/gfs.t" + HH + "z." + YY + MM + DD + ".sfcf" + FH + ".nc"
     )  # gfs met file
     f_can = (
-        path + "/gfs.canopy.t" + HH + "z." + "2022" + MM + DD + ".sfcf" + FH + ".global.nc"
+        path
+        + "/gfs.canopy.t"
+        + HH
+        + "z."
+        + "2022"
+        + MM
+        + DD
+        + ".sfcf"
+        + FH
+        + ".global.nc"
     )  # canopy file
     f_output = (
         path + "/gfs.t" + HH + "z." + YY + MM + DD + ".sfcf" + FH + ".canopy.nc"
@@ -301,15 +310,9 @@ for inputtime in timelist:
 
     if can_src == 1:  # global canopy data file from AWS
         f_can_list = {
-            "lai": path
-            + "/canopy_leaf_area_index."
-            + YY
-            + ".0.01.nc",
+            "lai": path + "/canopy_leaf_area_index." + YY + ".0.01.nc",
             "clu": path + "/canopy_clumping_index.2001_2017.0.01.nc",
-            "canfrac": path
-            + "/canopy_green_vegetation_fraction."
-            + YY
-            + ".0.01.nc",
+            "canfrac": path + "/canopy_green_vegetation_fraction." + YY + ".0.01.nc",
             "ch": path + "/canopy_height.2020.0.01.nc",
             "pavd": path + "/canopy_plant_area_volume_density.2019_2023.0.01.nc",
         }
@@ -392,14 +395,14 @@ for inputtime in timelist:
                     "-O",
                     f,
                     "https://noaa-oar-arl-nacc-pds.s3.amazonaws.com/inputs/geo-files/"
-                    + f[f.rindex("/") + 1:],
+                    + f[f.rindex("/") + 1 :],
                 ]
             )
             if os.path.isfile(f) is True:
                 os.chmod(f, 0o0755)
-                print("----", f[f.rindex("/") + 1:], "downloaded!")
+                print("----", f[f.rindex("/") + 1 :], "downloaded!")
             else:
-                print("----", f[f.rindex("/") + 1:], "not available. Terminated!")
+                print("----", f[f.rindex("/") + 1 :], "not available. Terminated!")
                 exit()
     elif can_src == 2:  # user specified
         checklist = [
