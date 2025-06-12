@@ -218,6 +218,7 @@ def read_aws_canopy(filename, basefile, varname, month):
 def read_user_canopy():
     # Please specify the necessary processing of user canopy data here.
     # Recommanded data processes include but not limit to: data read in, unit conversion and gridding.
+    DATA = np.empty(1)
     return DATA
 
 
