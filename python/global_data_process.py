@@ -30,7 +30,7 @@ timelist = np.array(timelist.split(",")).astype(str)
 path = "./input"  # work directory
 ref_lev = 10  # reference height (m, a.g.l.)
 frp_src = 0  # frp data source (0: local fire product; 1: 12 month climatology; 2: all ones when ifcanwaf=.FALSE.)
-can_src = 1  # canopy data source (0: climatology from gfs sample file; 1: user specified)
+can_src = 0  # canopy data source (0: pre-generated daily global file based on year 2022; 1: user specified)
 
 
 # ------------------------------ ATTENTION -------------------------------- #
